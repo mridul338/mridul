@@ -1,0 +1,359 @@
+<title>Regret-Free Spending</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column styled like a time clock — price in, timecard out, decide, ledger below */
+:root {
+  --bg: #e9edf1;
+  --paper: #f8fafb;
+  --ink: #18202b;
+  --muted: #5b6878;
+  --line: #cfd7e0;
+  --accent: #1f5fbf;
+  --accent-soft: #dbe6f7;
+  --skip: #17845a;
+  --skip-soft: #dcf1e7;
+  --buy: #b8432a;
+  --buy-soft: #f6e1db;
+  --wait: #9a6a07;
+  --wait-soft: #f5ead2;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161d; --paper: #19202a; --ink: #e6ebf1; --muted: #93a0b0; --line: #2c3644;
+    --accent: #7aa8f0; --accent-soft: #1f2c40; --skip: #4fc796; --skip-soft: #16302a;
+    --buy: #ee8a72; --buy-soft: #3a211c; --wait: #e2b452; --wait-soft: #352a14; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161d; --paper: #19202a; --ink: #e6ebf1; --muted: #93a0b0; --line: #2c3644;
+  --accent: #7aa8f0; --accent-soft: #1f2c40; --skip: #4fc796; --skip-soft: #16302a;
+  --buy: #ee8a72; --buy-soft: #3a211c; --wait: #e2b452; --wait-soft: #352a14; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 48px; display: grid; gap: 20px; }
+header h1 { font: 800 clamp(28px, 7vw, 40px)/1.05 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+header p { margin: 6px 0 0; color: var(--muted); }
+.label { font: 600 11px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.panel { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 14px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row > * { flex: 1 1 120px; min-width: 0; }
+.field { display: grid; gap: 6px; }
+input, select { width: 100%; font: 500 16px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.price-input { font: 600 22px var(--mono); }
+details summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+details summary::-webkit-details-marker { display: none; }
+details summary .rate { font: 600 14px var(--mono); color: var(--accent); }
+details[open] summary { margin-bottom: 14px; }
+
+/* the timecard */
+.card { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.card-top { padding: 18px 18px 14px; border-bottom: 1px dashed var(--line); display: grid; gap: 4px; }
+.card-top .item { font: 600 15px var(--body); color: var(--muted); overflow-wrap: anywhere; }
+.big { font: 800 clamp(34px, 10vw, 54px)/1 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.big small { font-size: 0.45em; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.sub { color: var(--muted); }
+.sub b { color: var(--ink); font-weight: 600; }
+.days { padding: 14px 18px; display: grid; gap: 8px; }
+.blocks { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.blk { height: 22px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.blk i { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
+.days .note { font: 400 12px var(--mono); color: var(--muted); }
+.facts { padding: 0 18px 16px; display: grid; gap: 6px; font-size: 14px; }
+.facts div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 6px; }
+.facts span:last-child { font: 600 14px var(--mono); text-align: right; }
+.actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 18px 18px; }
+button { font: 600 14px var(--body); border-radius: 10px; padding: 12px 8px; border: 1px solid transparent; cursor: pointer; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.b-skip { background: var(--skip); color: var(--paper); }
+.b-wait { background: var(--wait-soft); color: var(--wait); border-color: var(--wait); }
+.b-buy { background: var(--buy-soft); color: var(--buy); border-color: var(--buy); }
+
+/* stats */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 4px; min-width: 0; }
+.stat strong { font: 700 20px/1.1 var(--display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat.good strong { color: var(--skip); }
+.stat.bad strong { color: var(--buy); }
+
+/* ledger */
+.list { display: grid; gap: 0; }
+.entry { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.entry:first-child { border-top: 0; }
+.entry .name { min-width: 0; overflow-wrap: anywhere; }
+.entry .name small { display: block; color: var(--muted); font-size: 12px; }
+.entry .amt { font: 600 13px var(--mono); text-align: right; }
+.pill { font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 5px 7px; border-radius: 99px; }
+.pill.skip { background: var(--skip-soft); color: var(--skip); }
+.pill.buy { background: var(--buy-soft); color: var(--buy); }
+.pill.wait { background: var(--wait-soft); color: var(--wait); }
+.mini { display: flex; gap: 6px; margin-top: 6px; }
+.mini button { padding: 6px 10px; font-size: 12px; }
+.empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+.ex-tag { font: 600 10px var(--mono); color: var(--accent); background: var(--accent-soft); padding: 3px 6px; border-radius: 6px; margin-left: 6px; vertical-align: middle; }
+.linkbtn { background: none; border: 0; color: var(--muted); text-decoration: underline; padding: 0; font: 500 12px var(--body); justify-self: start; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 10px; font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { .blk i { transition: none; } }
+@media (max-width: 380px) { .stats { grid-template-columns: 1fr; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Regret-Free Spending</h1>
+    <p>Before you buy it, see how much of your working life it costs.</p>
+  </header>
+
+  <details class="panel" id="setup">
+    <summary>
+      <span class="label">Your pay</span>
+      <span class="rate" id="rateLabel"></span>
+    </summary>
+    <div class="row">
+      <div class="field"><label class="label" for="pay">Take-home pay</label><input id="pay" type="number" min="0" inputmode="decimal"></div>
+      <div class="field"><label class="label" for="period">Per</label>
+        <select id="period"><option value="hour">Hour</option><option value="month">Month</option><option value="year">Year</option></select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label class="label" for="hours">Hours worked / week</label><input id="hours" type="number" min="1" max="120" inputmode="decimal"></div>
+      <div class="field"><label class="label" for="cur">Currency</label>
+        <select id="cur"><option>₹</option><option>$</option><option>€</option><option>£</option><option>¥</option></select></div>
+    </div>
+  </details>
+
+  <section class="panel">
+    <div class="row">
+      <div class="field" style="flex:2 1 180px"><label class="label" for="itemName">What do you want to buy?</label><input id="itemName" type="text" maxlength="60" placeholder="e.g. Wireless earbuds"></div>
+      <div class="field"><label class="label" for="price">Price</label><input id="price" class="price-input" type="number" min="0" inputmode="decimal"></div>
+    </div>
+  </section>
+
+  <section class="card" aria-live="polite">
+    <div class="card-top">
+      <span class="label">This costs you</span>
+      <div class="item" id="outItem"></div>
+      <div class="big" id="outTime"></div>
+      <div class="sub" id="outDays"></div>
+    </div>
+    <div class="days">
+      <span class="label">Workdays on your timecard</span>
+      <div class="blocks" id="blocks"></div>
+      <div class="note" id="blocksNote"></div>
+    </div>
+    <div class="facts" id="facts"></div>
+    <div class="actions">
+      <button class="b-skip" id="skipBtn">Skip it</button>
+      <button class="b-wait" id="waitBtn">Wait 24 h</button>
+      <button class="b-buy" id="buyBtn">Buy it</button>
+    </div>
+  </section>
+
+  <section class="stats">
+    <div class="stat good"><span class="label">Money kept</span><strong id="sSaved"></strong></div>
+    <div class="stat good"><span class="label">Hours kept</span><strong id="sHours"></strong></div>
+    <div class="stat bad"><span class="label">Hours spent</span><strong id="sSpent"></strong></div>
+  </section>
+
+  <section class="panel" id="waitPanel">
+    <span class="label">Waiting list</span>
+    <div class="list" id="waitList"></div>
+  </section>
+
+  <section class="panel">
+    <span class="label">Decisions</span>
+    <div class="list" id="ledger"></div>
+    <button class="linkbtn" id="clearBtn">Clear history</button>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const KEY = "regret-free-spending-v1";
+const DAY = 864e5;
+const now = Date.now();
+const sample = {
+  settings: { pay: 60000, period: "month", hours: 45, cur: "₹" },
+  draft: { name: "Wireless earbuds", price: 8999 },
+  examples: true,
+  ledger: [
+    { id: 1, name: "Sneakers", price: 6500, decision: "skip", ts: now - 3 * DAY, ex: true },
+    { id: 2, name: "Movie night", price: 900, decision: "buy", ts: now - 5 * DAY, ex: true },
+    { id: 3, name: "Smartwatch", price: 14999, decision: "skip", ts: now - 9 * DAY, ex: true }
+  ],
+  wait: [{ id: 4, name: "Gaming chair", price: 12000, ts: now - 26 * 36e5, ex: true }]
+};
+
+let state;
+try { state = JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { state = null; }
+if (!state || !state.settings) state = structuredClone(sample);
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+
+const $ = id => document.getElementById(id);
+const els = { pay: $("pay"), period: $("period"), hours: $("hours"), cur: $("cur"), itemName: $("itemName"), price: $("price") };
+
+function hourly() {
+  const { pay, period, hours } = state.settings;
+  if (!(pay > 0) || !(hours > 0)) return 0;
+  if (period === "hour") return pay;
+  const yearly = period === "month" ? pay * 12 : pay;
+  return yearly / (hours * 52);
+}
+const dayHours = () => (state.settings.hours || 40) / 5;
+function money(n) {
+  const c = state.settings.cur;
+  const locale = c === "₹" ? "en-IN" : "en-US";
+  return c + Math.round(n).toLocaleString(locale);
+}
+function dur(h) {
+  if (!isFinite(h) || h <= 0) return "0 min";
+  const totalMin = Math.round(h * 60);
+  const hh = Math.floor(totalMin / 60), mm = totalMin % 60;
+  if (hh === 0) return mm + " min";
+  return mm ? `${hh.toLocaleString()} h ${mm} min` : `${hh.toLocaleString()} h`;
+}
+function durHTML(h) {
+  return dur(h).replace(/(\d[\d,]*)\s(h|min)/g, "$1<small> $2</small>");
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ago = ts => {
+  const d = Math.floor((Date.now() - ts) / DAY);
+  return d <= 0 ? "today" : d === 1 ? "yesterday" : d + " days ago";
+};
+
+function renderSetup() {
+  const s = state.settings;
+  els.pay.value = s.pay ?? ""; els.period.value = s.period; els.hours.value = s.hours ?? ""; els.cur.value = s.cur;
+  const r = hourly();
+  $("rateLabel").textContent = r ? money(r) + " / hour" : "Set your pay";
+}
+
+function renderCard() {
+  const price = +state.draft.price || 0;
+  const name = state.draft.name.trim();
+  const r = hourly();
+  const h = r ? price / r : 0;
+  const dh = dayHours();
+  const days = h / dh;
+
+  $("outItem").textContent = name || "Your purchase";
+  $("outTime").innerHTML = r ? durHTML(h) : "Set your pay";
+  $("outDays").innerHTML = !r || !price ? "Enter a price to see the cost in time."
+    : days < 1 ? `That is <b>${Math.round(days * 100)}%</b> of a ${dh.toFixed(dh % 1 ? 1 : 0)}-hour workday.`
+    : `That is <b>${days.toFixed(1)} workdays</b>, or ${(days / 5).toFixed(1)} work weeks.`;
+
+  const shown = Math.min(Math.max(Math.ceil(days), 1), 30);
+  let html = "";
+  for (let i = 0; i < Math.max(shown, 10); i++) {
+    const fill = Math.max(0, Math.min(1, days - i));
+    html += `<div class="blk"><i style="width:${(fill * 100).toFixed(1)}%"></i></div>`;
+  }
+  $("blocks").innerHTML = html;
+  $("blocksNote").textContent = days > 30 ? `Showing 30 of ${Math.ceil(days)} workdays.` : `Each block is one ${dh.toFixed(dh % 1 ? 1 : 0)}-hour workday.`;
+
+  const tenYears = price * Math.pow(1.07, 10);
+  const weekly = price / 52;
+  $("facts").innerHTML = price ? `
+    <div><span>Invested for 10 years at 7%</span><span>${money(tenYears)}</span></div>
+    <div><span>Spread over a year</span><span>${money(weekly)} / week</span></div>
+    <div><span>Minutes of work per ${money(100)}</span><span>${r ? Math.round(100 / r * 60) : 0} min</span></div>` : "";
+
+  const ok = price > 0 && r > 0;
+  ["skipBtn", "waitBtn", "buyBtn"].forEach(id => $(id).disabled = !ok);
+}
+
+function renderStats() {
+  const r = hourly() || 1;
+  const kept = state.ledger.filter(e => e.decision === "skip").reduce((a, e) => a + e.price, 0);
+  const spent = state.ledger.filter(e => e.decision === "buy").reduce((a, e) => a + e.price, 0);
+  $("sSaved").textContent = money(kept);
+  $("sHours").textContent = dur(kept / r);
+  $("sSpent").textContent = dur(spent / r);
+}
+
+function renderLists() {
+  const r = hourly() || 1;
+  const exTag = e => e.ex ? `<span class="ex-tag">Example</span>` : "";
+  const label = { skip: "Skipped", buy: "Bought", wait: "Waiting" };
+  const led = [...state.ledger].sort((a, b) => b.ts - a.ts);
+  $("ledger").innerHTML = led.length ? led.map(e => `
+    <div class="entry">
+      <span class="pill ${e.decision}">${label[e.decision]}</span>
+      <div class="name">${esc(e.name)}${exTag(e)}<small>${ago(e.ts)} · ${dur(e.price / r)} of work</small></div>
+      <span class="amt">${money(e.price)}</span>
+    </div>`).join("") : `<div class="empty">Nothing yet. Your skips and buys show up here.</div>`;
+
+  $("waitList").innerHTML = state.wait.length ? state.wait.map(e => {
+    const ready = Date.now() - e.ts >= DAY;
+    const left = Math.ceil((DAY - (Date.now() - e.ts)) / 36e5);
+    return `<div class="entry">
+      <span class="pill wait">${ready ? "Ready" : left + " h left"}</span>
+      <div class="name">${esc(e.name)}${exTag(e)}<small>${dur(e.price / r)} of work${ready ? " · Still want it?" : ""}</small>
+        ${ready ? `<div class="mini"><button class="b-skip" data-wait="${e.id}" data-d="skip">Skip it</button><button class="b-buy" data-wait="${e.id}" data-d="buy">Buy it</button></div>` : ""}
+      </div>
+      <span class="amt">${money(e.price)}</span>
+    </div>`;
+  }).join("") : `<div class="empty">Tap “Wait 24 h” on anything you're unsure about. It comes back here tomorrow.</div>`;
+}
+
+function render() { renderSetup(); renderCard(); renderStats(); renderLists(); }
+
+function clearExamples() {
+  if (!state.examples) return;
+  state.ledger = state.ledger.filter(e => !e.ex);
+  state.wait = state.wait.filter(e => !e.ex);
+  state.examples = false;
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2200);
+}
+
+function decide(decision) {
+  const price = +state.draft.price;
+  if (!(price > 0) || !hourly()) return;
+  clearExamples();
+  const entry = { id: Date.now(), name: state.draft.name.trim() || "Unnamed item", price, ts: Date.now() };
+  if (decision === "wait") state.wait.unshift(entry);
+  else state.ledger.push({ ...entry, decision });
+  const h = dur(price / hourly());
+  toast(decision === "skip" ? `Kept ${money(price)}, ${h} of work.` : decision === "buy" ? `Logged. Enjoy it.` : `Added to your waiting list.`);
+  state.draft = { name: "", price: "" };
+  els.itemName.value = ""; els.price.value = "";
+  save(); render();
+}
+
+[["pay", "pay", Number], ["period", "period", String], ["hours", "hours", Number], ["cur", "cur", String]].forEach(([id, k, fn]) => {
+  els[id].addEventListener("input", () => { state.settings[k] = els[id].value === "" ? null : fn(els[id].value); save(); renderSetup(); renderCard(); renderStats(); renderLists(); });
+});
+els.itemName.addEventListener("input", () => { state.draft.name = els.itemName.value; save(); renderCard(); });
+els.price.addEventListener("input", () => { state.draft.price = els.price.value; save(); renderCard(); });
+$("skipBtn").onclick = () => decide("skip");
+$("waitBtn").onclick = () => decide("wait");
+$("buyBtn").onclick = () => decide("buy");
+$("waitList").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-wait]"); if (!b) return;
+  const id = +b.dataset.wait;
+  const e = state.wait.find(x => x.id === id); if (!e) return;
+  state.wait = state.wait.filter(x => x.id !== id);
+  state.ledger.push({ ...e, decision: b.dataset.d, ts: Date.now() });
+  toast(b.dataset.d === "skip" ? `Kept ${money(e.price)}.` : "Logged. Enjoy it.");
+  save(); render();
+});
+let clearArmed = false;
+$("clearBtn").onclick = () => {
+  if (!clearArmed) { clearArmed = true; $("clearBtn").textContent = "Tap again to clear everything"; setTimeout(() => { clearArmed = false; $("clearBtn").textContent = "Clear history"; }, 3000); return; }
+  state.ledger = []; state.wait = []; state.examples = false; clearArmed = false;
+  $("clearBtn").textContent = "Clear history"; save(); render(); toast("History cleared.");
+};
+
+els.itemName.value = state.draft.name || "";
+els.price.value = state.draft.price ?? "";
+if (!state.settings.pay) $("setup").open = true;
+render();
+</script>
