@@ -49,6 +49,43 @@ button:focus-visible { outline: 3px solid var(--tang); outline-offset: 3px; }
 .tile.pop .ic { grid-row: span 2; }
 .tile.pop .sub { font-size: 15px; opacity: .95; }
 .tip { color: var(--soft); font-size: 14px; text-align: center; }
+.sec { margin: 6px 0 -4px; font: 900 24px var(--display); color: var(--ink); }
+.tile .skill { font: 700 12px var(--read); letter-spacing: .06em; text-transform: uppercase; background: rgba(255,255,255,.22); border-radius: 99px; padding: 3px 9px; }
+
+/* color mixer */
+.still { pointer-events: none; }
+.splat { width: 2.4em; height: 1.5em; margin: 0 auto; border: .08em solid var(--ink); border-radius: 50% 40% 55% 45% / 55% 50% 45% 50%; }
+.tlabel { font: 900 .5em/1.2 var(--display); text-align: center; color: var(--ink); white-space: nowrap; }
+.bowl { position: relative; width: 3.4em; height: 2em; background: var(--paper); border: .12em solid var(--ink); border-top-width: .16em; border-radius: 0 0 50% 50% / 0 0 100% 100%; overflow: hidden; }
+.paint { position: absolute; left: 0; right: 0; bottom: 0; height: 0; transition: height .5s ease, background-color .7s ease; }
+.pot { width: 1.5em; height: 1.5em; margin: 0 auto; border-radius: 50%; background: var(--c); border: .09em solid var(--ink); box-shadow: inset -.18em -.22em 0 rgba(0,0,0,.16); }
+.plabel { font: 900 .36em/1.3 var(--display); text-align: center; color: var(--ink); }
+.drop { width: 1em; height: 1em; border-radius: 50% 50% 50% 0; rotate: -45deg; background: var(--c); border: .1em solid var(--ink); transition: left .45s ease-in, top .45s ease-in; }
+
+/* memory */
+.mgrid { position: absolute; inset: 12% 5% 5%; display: grid; gap: 2.5cqmin; }
+.mcard { position: relative; border: 0; padding: 0; background: none; transform-style: preserve-3d; transition: transform .45s; touch-action: none; }
+.mcard.f { transform: rotateY(180deg); }
+.mcard > span { position: absolute; inset: 0; border-radius: 3.5cqmin; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: grid; place-items: center; box-shadow: 0 1cqmin 0 rgba(42,35,80,.2); }
+.mcard .back { background: repeating-linear-gradient(45deg, #5b8ee0 0 3cqmin, #4a7bcf 3cqmin 6cqmin); color: #fff; font: 900 9cqmin var(--display); }
+.mcard .front { background: var(--paper); transform: rotateY(180deg); font-size: 12cqmin; }
+.mcard.match .front { background: #e2f6e6; box-shadow: 0 0 0 1cqmin var(--leaf); }
+
+/* follow the lights */
+.sgrid { position: absolute; inset: 8% 7% 6%; display: grid; grid-template-columns: 1fr 1fr; gap: 4cqmin; }
+.pad { border: 0; border-radius: 7cqmin; background: var(--c); opacity: .45; color: #fff; font-size: 16cqmin; line-height: 1; box-shadow: 0 1.5cqmin 0 rgba(0,0,0,.35); transition: opacity .15s, transform .15s, box-shadow .15s; touch-action: none; }
+.pad.lit { opacity: 1; transform: scale(1.05); box-shadow: 0 0 8cqmin var(--c), 0 1.5cqmin 0 rgba(0,0,0,.35); }
+
+/* color sort */
+.basket { position: relative; width: 2.5em; height: 1.6em; background: var(--c); border: .09em solid var(--ink); border-radius: .2em .2em .9em .9em; display: grid; place-items: center;
+  background-image: repeating-linear-gradient(90deg, transparent 0 .3em, rgba(0,0,0,.12) .3em .36em); }
+.basket b { font: 900 .36em var(--display); background: var(--paper); color: var(--ink); border-radius: 99px; padding: .1em .5em; }
+.item { filter: drop-shadow(0 .6cqmin 0 rgba(0,0,0,.18)); }
+
+/* odd one out */
+.ogrid { position: absolute; inset: 10% 7% 5%; display: grid; gap: 4cqmin; }
+.ocell { container-type: size; min-width: 0; overflow: hidden; border: 0; border-radius: 5cqmin; background: rgba(255,255,255,.75); display: grid; place-items: center; min-height: 0; touch-action: none; box-shadow: 0 1cqmin 0 rgba(42,35,80,.12); }
+.shape { width: 66cqmin; height: 66cqmin; }
 
 /* ---------- player ---------- */
 .bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; }
@@ -165,7 +202,10 @@ button:focus-visible { outline: 3px solid var(--tang); outline-offset: 3px; }
         </div>
         <div class="star-count" id="starCount">⭐ 0</div>
       </div>
+      <h2 class="sec">Sing along</h2>
       <div class="tiles" id="tiles"></div>
+      <h2 class="sec">Think &amp; play</h2>
+      <div class="tiles" id="gameTiles"></div>
       <p class="tip" id="tip">Turn the sound on. Tap any word to hear it again.</p>
     </div>
   </section>
@@ -199,6 +239,22 @@ button:focus-visible { outline: 3px solid var(--tang); outline-offset: 3px; }
       <div class="hint-row">
         <div class="hint" id="popHint">Pop the bubbles that rhyme!</div>
         <button class="round say-btn" id="popSay" aria-label="Hear the word again">🔊</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- THINK & PLAY GAMES -->
+  <section class="screen" id="gamescreen" hidden>
+    <div class="bar">
+      <button class="round" id="gHome" aria-label="Back to home">🏠</button>
+      <h2 id="gTitle"></h2>
+      <div class="steps" id="gSteps"></div>
+    </div>
+    <div class="stage" id="gStage"></div>
+    <div class="lyric">
+      <div class="hint-row">
+        <div class="hint" id="gHint"></div>
+        <button class="round say-btn" id="gSay" aria-label="Hear it again">🔊</button>
       </div>
     </div>
   </section>
@@ -638,7 +694,7 @@ const RHYMES = [
 ];
 
 /* ================= player ================= */
-function show(id) { ["home", "player", "popgame"].forEach(s => $(s).hidden = s !== id); }
+function show(id) { ["home", "player", "popgame", "gamescreen"].forEach(s => $(s).hidden = s !== id); }
 
 function openRhyme(id) {
   audio();
@@ -695,7 +751,7 @@ function celebrate(icon, title, text, again) {
 }
 $("moreBtn").onclick = () => { $("overlay").hidden = true; goHome(); };
 
-function goHome() { stopSpeech(); clearTimers(); stopPop(); cur = null; stage.innerHTML = ""; show("home"); }
+function goHome() { stopSpeech(); clearTimers(); stopPop(); stopGame(); cur = null; stage.innerHTML = ""; show("home"); }
 $("homeBtn").onclick = goHome;
 $("popHome").onclick = goHome;
 $("sayBtn").onclick = () => {
@@ -784,9 +840,260 @@ function roundWon() {
 }
 $("popSay").onclick = () => { if (game) say(`Pop the words that rhyme with ${game.f.w}!`); };
 
+/* ================= think & play ================= */
+const COL = {
+  red: "#e8453c", orange: "#f5902a", yellow: "#f7c935", green: "#3fae5a", blue: "#2f84d6",
+  purple: "#8a54c6", pink: "#f58ab8", white: "#ffffff", "light blue": "#9ccbf2", "light yellow": "#fff0a0"
+};
+const gStage = $("gStage");
+let gm = null;
+
+function openGame(id) {
+  audio(); stopSpeech();
+  const def = GAMES.find(g => g.id === id);
+  gm = { def, round: 0 };
+  $("gTitle").textContent = def.title;
+  show("gamescreen");
+  runRound();
+}
+function runRound() {
+  clearTimers();
+  gStage.innerHTML = ""; gStage.onpointerdown = null; gStage.style.background = gm.def.bg;
+  gm.won = false;
+  $("gSteps").innerHTML = Array.from({ length: gm.def.rounds }, (_, i) => `<i class="${i < gm.round ? "on" : i === gm.round ? "now" : ""}"></i>`).join("");
+  $("gHint").classList.remove("yay");
+  gm.def.round(makeS(gStage), gm.round, gctx);
+}
+const gctx = {
+  hint(t, speak = true) { if (!gm) return; $("gHint").textContent = t; $("gHint").classList.remove("yay"); gm.hintText = t; if (speak) say(t, { rate: .95 }); },
+  win(msg) {
+    if (!gm || gm.won) return;
+    gm.won = true;
+    const m = msg || pick(["Great thinking!", "You got it!", "Super!", "Brilliant!"]);
+    $("gHint").textContent = m; $("gHint").classList.add("yay");
+    chime(); makeS(gStage).burst(50, 45, 16); say(m);
+    later(() => { if (!gm) return; gm.round++; gm.round < gm.def.rounds ? runRound() : finishGame(); }, 2000);
+  }
+};
+function finishGame() {
+  const d = gm.def;
+  saved.games = saved.games || {}; saved.games[d.id] = (saved.games[d.id] || 0) + 1; persist(); renderHome();
+  fanfare(); say(`Hooray! ${d.praise}`);
+  celebrate(d.icon, d.praise, `You earned a star for ${d.skill.toLowerCase()}.`, () => openGame(d.id));
+}
+function stopGame() { gm = null; gStage.innerHTML = ""; gStage.onpointerdown = null; }
+$("gHome").onclick = goHome;
+$("gSay").onclick = () => { if (gm && gm.hintText) say(gm.hintText, { rate: .95 }); };
+
+const MIX = { "red+yellow": "orange", "blue+yellow": "green", "blue+red": "purple", "red+white": "pink", "blue+white": "light blue", "white+yellow": "light yellow" };
+const mixOf = (a, b) => a === b ? a : MIX[[a, b].sort().join("+")];
+
+const SORT = {
+  red: [["🍎", "apple"], ["🍓", "strawberry"], ["🍒", "cherries"], ["🍅", "tomato"], ["🌶️", "chili"]],
+  yellow: [["🍌", "banana"], ["🍋", "lemon"], ["🌽", "corn"], ["🐥", "chick"], ["🌻", "sunflower"]],
+  green: [["🥦", "broccoli"], ["🥒", "cucumber"], ["🍐", "pear"], ["🐸", "frog"], ["🍀", "clover"]],
+  blue: [["🫐", "blueberries"], ["🐳", "whale"], ["🦋", "butterfly"], ["💎", "gem"], ["🧢", "cap"]]
+};
+const SHAPES = {
+  circle: "circle(48%)",
+  square: "inset(6% round 14%)",
+  triangle: "polygon(50% 4%, 97% 94%, 3% 94%)",
+  star: "polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
+  diamond: "polygon(50% 0, 100% 50%, 50% 100%, 0 50%)"
+};
+const ODD_COLORS = ["red", "orange", "yellow", "green", "blue", "purple", "pink"];
+
+const GAMES = [
+  {
+    id: "mix", title: "Color Mixer", icon: "🎨", color: "#e0602f", skill: "Colors & logic", rounds: 4,
+    praise: "You are a color scientist!", bg: "radial-gradient(circle at 50% 40%, #fffaf0, #ffe6c4)",
+    round(S, r, g) {
+      const target = ["orange", "green", "purple", "pink"][r];
+      const pots = r < 2 ? ["red", "yellow", "blue"] : ["red", "yellow", "blue", "white"];
+      S.sprite(`<div class="splat" style="background:${COL[target]}"></div><div class="tlabel">Make ${target}!</div>`, 50, 17, 10, "still");
+      const bowl = S.sprite(`<div class="bowl"><div class="paint"></div></div>`, 50, 50, 10, "still");
+      const paint = bowl.querySelector(".paint");
+      let inBowl = [], busy = false;
+      const step = 100 / pots.length;
+      pots.forEach((c, i) => {
+        const x = step * (i + .5);
+        const p = S.sprite(`<div class="pot" style="--c:${COL[c]}"></div><div class="plabel">${c}</div>`, x, 84, 9, "");
+        S.tap(p, () => {
+          if (busy || gm.won) return;
+          S.anim(p, "a-wiggle"); popSnd();
+          const d = S.sprite(`<div class="drop" style="--c:${COL[c]}"></div>`, x, 76, 5, "still");
+          requestAnimationFrame(() => requestAnimationFrame(() => S.place(d, 50, 46)));
+          setTimeout(() => d.remove(), 480);
+          inBowl.push(c);
+          if (inBowl.length === 1) {
+            later(() => { paint.style.background = COL[c]; paint.style.height = "45%"; }, 420);
+            say(c);
+          } else {
+            busy = true;
+            const [a, b] = inBowl, res = mixOf(a, b);
+            later(() => { paint.style.height = "85%"; paint.style.background = COL[res]; }, 420);
+            later(() => {
+              if (res === target) { g.win(`${a} and ${b} make ${target}!`); }
+              else {
+                boop();
+                g.hint(a === b ? `That's still ${res}. Try two different colors!` : `${a} and ${b} make ${res}. Try again!`);
+                later(() => { paint.style.height = "0"; inBowl = []; busy = false; }, 1600);
+              }
+            }, 1000);
+          }
+        });
+      });
+      g.hint(`Make ${target}! Tap two paint pots.`);
+    }
+  },
+  {
+    id: "memory", title: "Memory Match", icon: "🃏", color: "#3466c9", skill: "Memory", rounds: 3,
+    praise: "Your memory is super strong!", bg: "linear-gradient(#e3f2ff, #c6e3ff)",
+    round(S, r, g) {
+      const pairs = [3, 4, 6][r], cols = pairs === 3 ? 3 : 4, rows = pairs * 2 / cols;
+      const items = shuffle([["🍎", "apple"], ["🍌", "banana"], ["🫐", "blueberries"], ["🍇", "grapes"], ["🥝", "kiwi"], ["🍊", "orange"], ["🍓", "strawberry"], ["🍐", "pear"]]).slice(0, pairs);
+      const deck = shuffle([...items, ...items]);
+      const grid = S.div("mgrid");
+      grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`; grid.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
+      let open = [], busy = false, matched = 0;
+      deck.forEach(([e, name]) => {
+        const c = document.createElement("button");
+        c.className = "mcard"; c.setAttribute("aria-label", "Card");
+        c.innerHTML = `<span class="back">?</span><span class="front">${e}</span>`;
+        c.addEventListener("pointerdown", ev => {
+          ev.preventDefault(); ev.stopPropagation();
+          if (busy || c.classList.contains("f")) return;
+          c.classList.add("f"); tone(NOTE[pick(["C", "E", "G"])], .3, "sine", .15);
+          open.push([c, name]);
+          if (open.length < 2) return;
+          const [[c1, n1], [c2, n2]] = open; open = [];
+          if (n1 === n2) {
+            matched++; c1.classList.add("match"); c2.classList.add("match");
+            later(() => { popSnd(); say(n1); }, 300);
+            if (matched === pairs) later(() => g.win(), 900);
+          } else {
+            busy = true;
+            later(() => { c1.classList.remove("f"); c2.classList.remove("f"); busy = false; }, 1000);
+          }
+        });
+        grid.appendChild(c);
+      });
+      g.hint(r === 0 ? "Flip two cards. Find the pairs!" : `Find all ${pairs} pairs!`);
+    }
+  },
+  {
+    id: "lights", title: "Follow the Lights", icon: "💡", color: "#2a3566", skill: "Focus", rounds: 5,
+    praise: "You followed every light!", bg: "radial-gradient(circle at 50% 40%, #33447a, #151b3c)",
+    round(S, r, g) {
+      const PADS = [{ c: "red", s: "★", n: "C" }, { c: "blue", s: "●", n: "E" }, { c: "yellow", s: "▲", n: "G" }, { c: "green", s: "■", n: "C5" }];
+      const len = r + 2;
+      const seq = Array.from({ length: len }, () => Math.floor(Math.random() * 4));
+      const grid = S.div("sgrid");
+      let pos = 0, accepting = false;
+      const els = PADS.map((p, i) => {
+        const b = document.createElement("button");
+        b.className = "pad"; b.style.setProperty("--c", COL[p.c]); b.textContent = p.s; b.setAttribute("aria-label", p.c);
+        b.addEventListener("pointerdown", ev => {
+          ev.preventDefault(); ev.stopPropagation();
+          light(i);
+          if (!accepting || gm.won) return;
+          if (i === seq[pos]) {
+            pos++;
+            if (pos === len) { accepting = false; later(() => g.win(len > 3 ? `Wow! ${NUM[len] || len} lights!` : null), 400); }
+          } else {
+            accepting = false; later(boop, 250);
+            g.hint("Oops! Watch again.");
+            later(play, 1500);
+          }
+        });
+        grid.appendChild(b); return b;
+      });
+      function light(i) {
+        els[i].classList.add("lit"); tone(NOTE[PADS[i].n], .45, "sine", .22);
+        setTimeout(() => els[i] && els[i].classList.remove("lit"), 380);
+      }
+      function play() {
+        accepting = false;
+        g.hint(`Watch ${len} lights!`);
+        seq.forEach((i, k) => later(() => light(i), 1500 + k * 700));
+        later(() => { pos = 0; accepting = true; g.hint("Your turn!", false); }, 1500 + len * 700);
+      }
+      play();
+    }
+  },
+  {
+    id: "sort", title: "Color Sort", icon: "🧺", color: "#25936a", skill: "Sorting", rounds: 3,
+    praise: "Everything is sorted!", bg: "linear-gradient(#eaf7ff, #d6f1d4)",
+    round(S, r, g) {
+      const colors = [["red", "yellow"], ["red", "yellow", "green"], ["red", "yellow", "green", "blue"]][r];
+      const n = [4, 6, 8][r];
+      const step = 100 / colors.length;
+      colors.forEach((c, i) => S.sprite(`<div class="basket" style="--c:${COL[c]}"><b>${c}</b></div>`, step * (i + .5), 85, 9, "still"));
+      const bag = {}; colors.forEach(c => bag[c] = shuffle(SORT[c]));
+      const items = Array.from({ length: n }, (_, i) => { const c = colors[i % colors.length]; return [c, ...bag[c].pop()]; });
+      const slots = shuffle([[15, 22], [38, 18], [62, 22], [85, 18], [15, 48], [38, 52], [62, 48], [85, 52]]).slice(0, n);
+      let sorted = 0;
+      shuffle(items).forEach(([c, e, name], i) => {
+        const [hx, hy] = slots[i];
+        const el = S.sprite(e, hx, hy, 14, "item popin");
+        S.drag(el, () => {
+          const x = +el.dataset.x, y = +el.dataset.y;
+          if (y < 66) { S.place(el, hx, hy); return; }
+          const bi = Math.min(colors.length - 1, Math.max(0, Math.floor(x / step)));
+          if (colors[bi] === c) {
+            S.place(el, step * (bi + .5), 80); el.style.pointerEvents = "none";
+            later(() => { el.style.opacity = "0"; }, 350);
+            S.burst(step * (bi + .5), 80, 6); tone(NOTE.G, .3, "sine", .18); say(`${c} ${name}!`);
+            if (++sorted === n) later(() => g.win(), 700);
+          } else {
+            boop(); S.place(el, hx, hy);
+            g.hint(`The ${name} is ${c}!`);
+          }
+        });
+      });
+      g.hint(r === 0 ? "Drag each one to the basket with the same color!" : "Sort them by color!");
+    }
+  },
+  {
+    id: "odd", title: "Odd One Out", icon: "🔍", color: "#8448bf", skill: "Attention", rounds: 5,
+    praise: "You have super sharp eyes!", bg: "linear-gradient(#fbf2ff, #e6d8ff)",
+    round(S, r, g) {
+      const n = [4, 4, 6, 6, 9][r], cols = n === 4 ? 2 : 3;
+      const shapeNames = Object.keys(SHAPES);
+      const baseShape = pick(shapeNames), baseColor = pick(ODD_COLORS);
+      const byColor = r % 2 === 0;
+      const oddShape = byColor ? baseShape : pick(shapeNames.filter(s => s !== baseShape));
+      const oddColor = byColor ? pick(ODD_COLORS.filter(c => c !== baseColor)) : baseColor;
+      const oddAt = Math.floor(Math.random() * n);
+      const grid = S.div("ogrid");
+      grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`; grid.style.gridTemplateRows = `repeat(${n / cols}, minmax(0, 1fr))`;
+      for (let i = 0; i < n; i++) {
+        const odd = i === oddAt, sh = odd ? oddShape : baseShape, co = odd ? oddColor : baseColor;
+        const b = document.createElement("button");
+        b.className = "ocell"; b.setAttribute("aria-label", `${co} ${sh}`);
+        b.innerHTML = `<div class="shape" style="background:${COL[co]};clip-path:${SHAPES[sh]};rotate:${r >= 3 ? Math.floor(rnd(-20, 20)) : 0}deg"></div>`;
+        b.addEventListener("pointerdown", ev => {
+          ev.preventDefault(); ev.stopPropagation();
+          if (gm.won) return;
+          if (odd) { S.anim(b, "a-pop"); g.win(`Yes! The ${co} ${sh}!`); }
+          else { S.anim(b, "a-wiggle"); boop(); g.hint(byColor ? "Look again! Which color is different?" : "Look again! Which shape is different?"); }
+        });
+        grid.appendChild(b);
+      }
+      g.hint(r === 0 ? "Which one is different?" : "Find the odd one out!");
+    }
+  }
+];
+
 /* ================= home ================= */
 function renderHome() {
-  const stars = Object.keys(saved.done).length + (saved.pops || 0);
+  const games = saved.games || {};
+  const stars = Object.keys(saved.done).length + (saved.pops || 0) + Object.values(games).reduce((a, b) => a + b, 0);
+  $("gameTiles").innerHTML = GAMES.map(d => `
+    <button class="tile" data-game="${d.id}" style="background:${d.color}">
+      ${games[d.id] ? `<span class="done">★ ×${games[d.id]}</span>` : ""}
+      <span class="ic">${d.icon}</span><span class="nm">${d.title}</span><span class="skill">${d.skill}</span>
+    </button>`).join("");
   $("starCount").textContent = "⭐ " + stars;
   $("tiles").innerHTML = RHYMES.map(r => `
     <button class="tile" data-id="${r.id}" style="background:${r.color}">
@@ -801,6 +1108,9 @@ function renderHome() {
 $("tiles").addEventListener("click", e => {
   const t = e.target.closest(".tile"); if (!t) return;
   t.dataset.id === "pop" ? openPop() : openRhyme(t.dataset.id);
+});
+$("gameTiles").addEventListener("click", e => {
+  const t = e.target.closest(".tile"); if (t) openGame(t.dataset.game);
 });
 if (!synth) $("tip").textContent = "This browser can't read aloud, so the words light up without a voice. Taps still make music.";
 renderHome();
