@@ -1,0 +1,807 @@
+<title>Rhyme Garden</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grandstander:wght@700;900&family=Andika:wght@400;700&display=swap">
+<style>
+/* Layout: full-screen kids app. Home = big rhyme tiles; Player = touch stage on top, karaoke lyric bar below.
+   Deliberately single-theme (bright daytime picture book), so every color is set explicitly. */
+:root {
+  --sky: #cde8ff;
+  --ink: #2a2350;
+  --paper: #ffffff;
+  --sun: #ffc93c;
+  --tang: #ff7a2f;
+  --berry: #e0457b;
+  --leaf: #2fa35b;
+  --soft: #6a6490;
+  --display: "Grandstander", "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif;
+  --read: "Andika", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--sky); color: var(--ink); font: 17px/1.4 var(--read); overflow: hidden;
+  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--tang); outline-offset: 3px; }
+#app { position: relative; height: 100%; }
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; }
+
+/* ---------- home ---------- */
+#home { overflow-y: auto; padding-inline: 16px; padding-block: 22px 32px;
+  background: radial-gradient(circle at 88% 6%, #fff4b8 0 7%, transparent 7.2%), var(--sky); }
+.home-in { max-width: 760px; width: 100%; margin: 0 auto; display: grid; gap: 18px; }
+.home-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.home-head h1 { margin: 0; font: 900 clamp(38px, 10vw, 64px)/0.95 var(--display); letter-spacing: -0.01em; color: var(--ink); text-wrap: balance; }
+.home-head h1 span { color: var(--leaf); }
+.home-head p { margin: 6px 0 0; color: var(--soft); font-size: 17px; }
+.star-count { font: 900 22px var(--display); background: var(--paper); border-radius: 99px; padding: 8px 16px; box-shadow: 0 4px 0 #9cc6ea; white-space: nowrap; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.tile { position: relative; border: 0; border-radius: 26px; padding: 18px 14px 16px; min-height: 170px; color: #fff;
+  display: grid; justify-items: center; align-content: center; gap: 6px; text-align: center;
+  box-shadow: 0 7px 0 rgba(42, 35, 80, .28); transition: transform .12s; }
+.tile:active { transform: translateY(5px); box-shadow: 0 2px 0 rgba(42, 35, 80, .28); }
+.tile .ic { font-size: 64px; line-height: 1; filter: drop-shadow(0 4px 0 rgba(0,0,0,.15)); }
+.tile .nm { font: 900 21px/1.1 var(--display); text-wrap: balance; }
+.tile .done { position: absolute; top: 10px; right: 10px; background: var(--sun); color: var(--ink); font: 900 13px var(--display); border-radius: 99px; padding: 4px 9px; }
+.tile.pop { grid-column: 1 / -1; min-height: 130px; grid-template-columns: auto 1fr; justify-items: start; text-align: left; column-gap: 16px; padding-inline: 22px;
+  background: repeating-linear-gradient(-45deg, #ff8fb7 0 18px, #ff7aa8 18px 36px); }
+.tile.pop .ic { grid-row: span 2; }
+.tile.pop .sub { font-size: 15px; opacity: .95; }
+.tip { color: var(--soft); font-size: 14px; text-align: center; }
+
+/* ---------- player ---------- */
+.bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; }
+.round { width: 52px; height: 52px; flex: none; border-radius: 50%; border: 0; background: var(--paper); font-size: 26px; box-shadow: 0 4px 0 #9cc6ea; display: grid; place-items: center; }
+.round:active { transform: translateY(3px); box-shadow: 0 1px 0 #9cc6ea; }
+.bar h2 { margin: 0; font: 900 clamp(20px, 5vw, 28px) var(--display); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.steps { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; max-width: 45%; }
+.steps i { width: 11px; height: 11px; border-radius: 50%; background: rgba(42,35,80,.18); }
+.steps i.on { background: var(--leaf); }
+.steps i.now { background: var(--tang); transform: scale(1.3); }
+
+.stage { position: relative; flex: 1; min-height: 0; margin-inline: 12px; border-radius: 28px; overflow: hidden;
+  container-type: size; touch-action: none; box-shadow: inset 0 0 0 4px rgba(255,255,255,.6); }
+.sp { position: absolute; translate: -50% -50%; line-height: 1; cursor: pointer; transition: left .5s ease, top .5s ease, opacity .4s; }
+.sp.anchor { translate: -50% -100%; }
+.sp.held { transition: none; z-index: 5; filter: drop-shadow(0 8px 6px rgba(0,0,0,.25)); }
+.sp.deco { pointer-events: none; opacity: .75; }
+.sp.dim { opacity: .3; filter: grayscale(.6); }
+.goal { position: absolute; top: 10px; left: 50%; translate: -50% 0; display: flex; gap: 4px; background: rgba(255,255,255,.85); padding: 6px 10px; border-radius: 99px; z-index: 10; pointer-events: none; }
+.goal b { width: 22px; height: 22px; border-radius: 50%; background: rgba(42,35,80,.15); display: grid; place-items: center; font-size: 15px; }
+.goal b.on { background: var(--sun); }
+.count { position: absolute; left: 6%; top: 8%; font: 900 22cqmin/1 var(--display); color: var(--paper); text-shadow: 0 1cqmin 0 rgba(42,35,80,.35); pointer-events: none; }
+.label { position: absolute; left: 50%; top: 20%; translate: -50% -50%; font: 900 14cqmin/1 var(--display); color: var(--paper); letter-spacing: .06em; text-shadow: 0 1cqmin 0 rgba(42,35,80,.45); pointer-events: none; }
+.bubble { pointer-events: none; background: var(--paper); color: var(--ink); font-family: var(--display); font-weight: 900; padding: .25em .5em; border-radius: .6em; box-shadow: 0 .12em 0 rgba(42,35,80,.25); white-space: nowrap; z-index: 6; }
+.spark { position: absolute; pointer-events: none; font-size: 6cqmin; translate: -50% -50%; animation: fly .8s ease-out forwards; z-index: 7; }
+
+/* scenery */
+.wall { position: absolute; left: 22%; right: 22%; top: 56%; bottom: 0;
+  background: repeating-linear-gradient(0deg, #b4533a 0 9%, #e9dccb 9% 10.5%), #b4533a;
+  -webkit-mask: none; border-top: 1.5cqmin solid #8c3d29; }
+.wall::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 19%, #e9dccb 19% 20%); opacity: .6; }
+.spout { position: absolute; left: 44%; width: 9%; top: 10%; bottom: 4%; border-radius: 2cqmin 2cqmin 0 0;
+  background: linear-gradient(90deg, #7d889b, #d1d8e3 45%, #7d889b); box-shadow: inset 0 3cqmin 0 #5f6a7d; }
+.egg { position: relative; width: 1em; height: 1.3em; background: #fff3d1; border: .035em solid var(--ink); border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%; }
+.egg .e { position: absolute; top: .4em; width: .1em; height: .14em; background: var(--ink); border-radius: 50%; }
+.egg .e.l { left: .28em; } .egg .e.r { right: .28em; }
+.egg .m { position: absolute; top: .56em; left: .33em; width: .34em; height: .17em; border-bottom: .045em solid var(--ink); border-radius: 0 0 50% 50%; }
+.egg .belt { position: absolute; top: .84em; left: 0; right: 0; height: .12em; background: var(--berry); }
+.egg.top { clip-path: polygon(-5% -5%, 105% -5%, 105% 57%, 88% 50%, 72% 60%, 56% 50%, 40% 60%, 24% 50%, 10% 60%, -5% 52%); }
+.egg.bot { clip-path: polygon(-5% 52%, 10% 60%, 24% 50%, 40% 60%, 56% 50%, 72% 60%, 88% 50%, 105% 57%, 105% 105%, -5% 105%); }
+
+/* lyric bar */
+.lyric { margin: 12px; background: var(--paper); border-radius: 24px; padding: 14px 16px 12px; display: grid; gap: 8px; box-shadow: 0 5px 0 #9cc6ea; }
+.words { display: flex; flex-wrap: wrap; gap: 2px 8px; font: 700 clamp(22px, 5.6vw, 36px)/1.25 var(--read); }
+.w { border: 0; background: none; padding: 0 2px; border-radius: 8px; color: #b7b3cf; transition: color .15s, background .15s; }
+.w.on { color: var(--ink); }
+.w.lit { background: var(--sun); }
+.hint-row { display: flex; align-items: center; gap: 10px; }
+.hint { flex: 1; min-width: 0; font: 900 clamp(16px, 4vw, 20px) var(--display); color: var(--tang); }
+.hint::before { content: "👆"; display: inline-block; margin-right: 6px; animation: bob 1s ease-in-out infinite; }
+.hint.yay { color: var(--leaf); }
+.hint.yay::before { content: "🎉"; }
+.say-btn { width: 44px; height: 44px; font-size: 20px; box-shadow: 0 3px 0 #d7d3ea; background: #f3f1fb; }
+
+/* rhyme pop */
+.target { position: absolute; top: 12px; left: 50%; translate: -50% 0; background: var(--paper); border-radius: 22px; padding: 8px 18px; display: flex; align-items: center; gap: 10px; z-index: 10; box-shadow: 0 5px 0 rgba(42,35,80,.2); }
+.target .ic { font-size: 40px; line-height: 1; }
+.target .tw { font: 900 34px/1 var(--display); }
+.target small { display: block; font: 700 13px var(--read); color: var(--soft); }
+.bub { position: absolute; width: 23cqmin; height: 23cqmin; max-width: 140px; max-height: 140px; min-width: 92px; min-height: 92px; translate: -50% 0; border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #fff 0 9%, rgba(255,255,255,.55) 10% 40%, rgba(186, 225, 255, .55) 70%, rgba(140, 200, 255, .75));
+  border: 3px solid rgba(255,255,255,.9); display: grid; place-content: center; text-align: center; animation: rise linear forwards; touch-action: none; }
+.bub .ic { font-size: 34px; line-height: 1; }
+.bub .bw { font: 900 19px var(--display); color: var(--ink); }
+.bub.nope { animation-play-state: paused; }
+.bub.nope > * { animation: shake .4s; }
+
+/* overlay */
+.overlay { position: absolute; inset: 0; background: rgba(42,35,80,.55); display: grid; place-items: center; padding-inline: 16px; z-index: 50; }
+.cele { background: var(--paper); border-radius: 32px; padding: 26px 22px; width: min(420px, 100%); display: grid; gap: 12px; justify-items: center; text-align: center; box-shadow: 0 8px 0 rgba(0,0,0,.2); }
+.cele .big { font-size: 96px; line-height: 1; animation: popin .6s, spin 2.4s .6s ease-in-out infinite alternate; }
+.cele h3 { margin: 0; font: 900 30px/1.1 var(--display); text-wrap: balance; }
+.cele p { margin: 0; color: var(--soft); }
+.cele .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.pill-btn { border: 0; border-radius: 99px; padding: 14px 22px; font: 900 19px var(--display); color: #fff; background: var(--leaf); box-shadow: 0 5px 0 #1f7a42; }
+.pill-btn.alt { background: var(--tang); box-shadow: 0 5px 0 #c4561c; }
+.pill-btn:active { transform: translateY(4px); box-shadow: none; }
+
+/* motion */
+@keyframes popin { 0% { transform: scale(0); } 70% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes twinkle { 50% { opacity: .55; transform: scale(.9); } }
+@keyframes bob { 50% { transform: translateY(-4px); } }
+@keyframes float { 50% { transform: translateY(-7%); } }
+@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14%); } }
+@keyframes wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-14deg) scale(1.08); } 75% { transform: rotate(14deg) scale(1.08); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes jump { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-70%) rotate(-10deg); } }
+@keyframes fly { to { transform: translate(var(--dx), var(--dy)) scale(.4); opacity: 0; } }
+@keyframes rise { from { top: 105%; } to { top: -30%; } }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+.popin { animation: popin .45s; }
+.float { animation: float 3s ease-in-out infinite; }
+.bounce { animation: bounce .9s ease-in-out infinite; }
+.twinkle { animation: popin .45s, twinkle 1.6s .45s ease-in-out infinite; }
+/* one-shot reactions come last so they win over the loops above */
+.a-wiggle { animation: wiggle .5s; }
+.a-spin { animation: spin .7s ease-in-out; }
+.a-jump { animation: jump .6s ease-out; }
+.a-pop { animation: popin .4s; }
+@media (prefers-reduced-motion: reduce) {
+  .float, .bounce, .twinkle, .hint::before, .cele .big { animation: none !important; }
+  .sp { transition-duration: .01s; }
+}
+</style>
+
+<div id="app">
+  <!-- HOME -->
+  <section class="screen" id="home">
+    <div class="home-in">
+      <div class="home-head">
+        <div>
+          <h1>Rhyme <span>Garden</span></h1>
+          <p>Touch the pictures. Sing the songs.</p>
+        </div>
+        <div class="star-count" id="starCount">⭐ 0</div>
+      </div>
+      <div class="tiles" id="tiles"></div>
+      <p class="tip" id="tip">Turn the sound on. Tap any word to hear it again.</p>
+    </div>
+  </section>
+
+  <!-- PLAYER -->
+  <section class="screen" id="player" hidden>
+    <div class="bar">
+      <button class="round" id="homeBtn" aria-label="Back to all rhymes">🏠</button>
+      <h2 id="pTitle"></h2>
+      <div class="steps" id="steps"></div>
+    </div>
+    <div class="stage" id="stage"></div>
+    <div class="lyric">
+      <div class="words" id="words"></div>
+      <div class="hint-row">
+        <div class="hint" id="hint"></div>
+        <button class="round say-btn" id="sayBtn" aria-label="Sing this line again">🔊</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RHYME POP -->
+  <section class="screen" id="popgame" hidden>
+    <div class="bar">
+      <button class="round" id="popHome" aria-label="Back to all rhymes">🏠</button>
+      <h2>Rhyme Pop</h2>
+      <div class="steps" id="popSteps"></div>
+    </div>
+    <div class="stage" id="popStage" style="background: linear-gradient(#8fd0ff, #d8f0ff 70%, #bfe8b0 70%)"></div>
+    <div class="lyric">
+      <div class="hint-row">
+        <div class="hint" id="popHint">Pop the bubbles that rhyme!</div>
+        <button class="round say-btn" id="popSay" aria-label="Hear the word again">🔊</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="overlay" id="overlay" hidden>
+    <div class="cele">
+      <div class="big" id="celeIcon">⭐</div>
+      <h3 id="celeTitle">You did it!</h3>
+      <p id="celeText"></p>
+      <div class="row">
+        <button class="pill-btn alt" id="againBtn">Play again</button>
+        <button class="pill-btn" id="moreBtn">More rhymes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= sound ================= */
+let actx;
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+function tone(f, dur = .4, type = "triangle", vol = .18, when = 0) {
+  const a = audio(); if (!a || !f) return;
+  const t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .02); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .05);
+}
+const NOTE = { G3: 196, A3: 220, B3: 246.94, C: 261.63, D: 293.66, E: 329.63, F: 349.23, G: 392, A: 440, B: 493.88, C5: 523.25, D5: 587.33, E5: 659.25 };
+const popSnd = () => { tone(720, .12, "sine", .2); tone(1180, .1, "sine", .12, .04); };
+const chime = () => [0, 4, 7, 12].forEach((s, i) => tone(523.25 * 2 ** (s / 12), .55, "triangle", .14, i * .09));
+const boop = () => { tone(220, .18, "sine", .16); tone(165, .25, "sine", .14, .1); };
+const fanfare = () => [0, 4, 7, 12, 7, 12].forEach((s, i) => tone(392 * 2 ** (s / 12), .5, "square", .07, i * .13));
+
+/* ================= speech ================= */
+const synth = window.speechSynthesis || null;
+let voice = null, speakToken = 0;
+function pickVoice() {
+  if (!synth) return;
+  const vs = synth.getVoices();
+  voice = vs.find(v => /^en/i.test(v.lang) && /female|samantha|karen|serena|moira|tessa|zira/i.test(v.name))
+       || vs.find(v => /^en-(GB|US)/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+}
+if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
+
+function utter(text, rate = .85, pitch = 1.25) {
+  const u = new SpeechSynthesisUtterance(text);
+  if (voice) u.voice = voice;
+  u.rate = rate; u.pitch = pitch; u.lang = voice ? voice.lang : "en-US";
+  return u;
+}
+// Short word or phrase. Interrupts whatever is playing.
+function say(text, opts = {}) {
+  const tok = ++speakToken;
+  if (cur && !cur.speechDone) { cur.speechDone = true; markWords(99); maybeAdvance(); }
+  if (!synth) return;
+  synth.cancel();
+  const u = utter(text, opts.rate || .9, opts.pitch || 1.3);
+  if (opts.onend) u.onend = () => { if (tok === speakToken) opts.onend(); };
+  synth.speak(u);
+}
+// Sing a lyric line with karaoke highlighting.
+function speakLine(text, onend) {
+  const tok = ++speakToken;
+  if (synth) synth.cancel();
+  const words = text.split(" ");
+  const offs = []; let p = 0; words.forEach(w => { offs.push(p); p += w.length + 1; });
+  let i = 0, gotBoundary = false, finished = false;
+  markWords(0);
+  const per = 430;
+  const timer = setInterval(() => { if (gotBoundary || tok !== speakToken) return clearInterval(timer); i = Math.min(i + 1, words.length - 1); markWords(i); }, per);
+  const finish = () => {
+    if (finished || tok !== speakToken) return;
+    finished = true; clearInterval(timer); clearTimeout(safety); markWords(99); onend && onend();
+  };
+  const safety = setTimeout(finish, per * words.length + (synth ? 5000 : 300));
+  if (!synth) return;
+  const u = utter(text);
+  u.onboundary = e => {
+    if (tok !== speakToken || (e.name && e.name !== "word")) return;
+    gotBoundary = true; clearInterval(timer);
+    let k = 0; offs.forEach((o, j) => { if (o <= e.charIndex) k = j; }); markWords(k);
+  };
+  u.onend = finish; u.onerror = finish;
+  synth.speak(u);
+}
+function stopSpeech() { speakToken++; if (synth) synth.cancel(); }
+
+/* ================= storage ================= */
+const KEY = "rhyme-garden-v1";
+let saved = { done: {}, pops: 0 };
+try { saved = Object.assign(saved, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
+const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} };
+
+/* ================= helpers ================= */
+const $ = id => document.getElementById(id);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = arr => arr.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+const NUM = ["Zero", "One", "Two", "Three", "Four", "Five"];
+let timers = [];
+const later = (fn, ms) => { const t = setTimeout(fn, ms); timers.push(t); return t; };
+const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+
+const stage = $("stage");
+let cur = null; // current rhyme session
+
+function markWords(i) {
+  document.querySelectorAll("#words .w").forEach((s, j) => {
+    s.classList.toggle("on", j <= i);
+    s.classList.toggle("lit", j === i && i < 99);
+  });
+}
+
+/* Scene toolkit handed to every lyric line */
+function makeS(st) {
+  const S = {
+    stage: st,
+    bg(v) { st.style.background = v; },
+    place(el, x, y) { el.style.left = x + "%"; el.style.top = y + "%"; el.dataset.x = x; el.dataset.y = y; },
+    sprite(ch, x, y, size, cls = "") {
+      const el = document.createElement("div");
+      el.className = "sp " + cls; el.innerHTML = ch;
+      el.style.cssText = `font-size:${size}vmin;font-size:${size}cqmin`;
+      S.place(el, x, y); st.appendChild(el); return el;
+    },
+    div(cls) { const d = document.createElement("div"); d.className = cls; st.appendChild(d); return d; },
+    tap(el, fn) { el.addEventListener("pointerdown", e => { e.stopPropagation(); e.preventDefault(); fn(e); }); },
+    onStage(fn) { st.onpointerdown = e => { e.preventDefault(); fn(e); }; },
+    pct(e) { const r = st.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 100, (e.clientY - r.top) / r.height * 100]; },
+    anim(el, name) {
+      el.classList.remove(name); void el.offsetWidth; el.classList.add(name);
+      el.addEventListener("animationend", function h(ev) { if (ev.animationName === name.slice(2)) { el.classList.remove(name); el.removeEventListener("animationend", h); } });
+    },
+    burst(x, y, n = 8, ch = ["✨", "⭐", "💛", "🌟"]) {
+      for (let i = 0; i < n; i++) {
+        const s = document.createElement("span"); s.className = "spark"; s.textContent = pick(ch);
+        const ang = Math.random() * Math.PI * 2, d = rnd(14, 26);
+        s.style.left = x + "%"; s.style.top = y + "%";
+        s.style.setProperty("--dx", Math.cos(ang) * d + "cqmin"); s.style.setProperty("--dy", Math.sin(ang) * d + "cqmin");
+        st.appendChild(s); setTimeout(() => s.remove(), 850);
+      }
+    },
+    bubble(text, x, y, size = 6) {
+      const b = S.sprite(text, x, y, size, "bubble popin"); setTimeout(() => b.remove(), 1400); return b;
+    },
+    decor(n, ch = "✦", size = 3) { for (let i = 0; i < n; i++) S.sprite(ch, rnd(4, 96), rnd(6, 60), size * rnd(.7, 1.3), "deco"); },
+    drag(el, onDrop) {
+      el.style.touchAction = "none";
+      el.addEventListener("pointerdown", e => {
+        e.stopPropagation(); e.preventDefault();
+        try { el.setPointerCapture(e.pointerId); } catch (_) {}
+        el.classList.add("held"); popSnd();
+        const mv = ev => { const [x, y] = S.pct(ev); S.place(el, Math.max(5, Math.min(95, x)), Math.max(10, Math.min(98, y))); };
+        const up = () => { el.removeEventListener("pointermove", mv); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); el.classList.remove("held"); onDrop(el); };
+        el.addEventListener("pointermove", mv); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+      });
+    },
+    goal(n) { cur.goalN = n; cur.count = 0; renderGoal(); },
+    note() { const t = cur.r.tune; tone(NOTE[t[cur.tuneI++ % t.length]], .5); },
+    tick() {
+      S.note();
+      if (cur.lineDone) return false;
+      cur.count++; renderGoal();
+      if (cur.count >= cur.goalN) S.done();
+      return true;
+    },
+    done() {
+      if (cur.lineDone) return;
+      cur.lineDone = true; renderGoal();
+      $("hint").textContent = pick(["Yay!", "Great job!", "Super!", "Well done!", "Wow!"]);
+      $("hint").classList.add("yay");
+      later(() => { chime(); S.burst(50, 45, 14); }, 250);
+      maybeAdvance();
+    },
+    say: t => say(t)
+  };
+  return S;
+}
+
+function renderGoal() {
+  let g = stage.querySelector(".goal");
+  if (!g) { g = document.createElement("div"); g.className = "goal"; stage.appendChild(g); }
+  g.innerHTML = Array.from({ length: cur.goalN }, (_, i) => `<b class="${i < cur.count ? "on" : ""}">${i < cur.count ? "⭐" : ""}</b>`).join("");
+}
+
+/* ================= scenes ================= */
+const NIGHT = "radial-gradient(circle at 80% 15%, #3d3a8f 0, transparent 40%), linear-gradient(#121646, #33287a)";
+const DAY = "linear-gradient(#a9dcff, #e6f6ff 56%, #8fd18a 56%)";
+const SPRING = "linear-gradient(#a9dcff, #e6f6ff 85%, #8fd18a 85%)";
+const RAINY = "linear-gradient(#8496ad, #c9d3df 85%, #7fa67a 85%)";
+const SUNNY = "linear-gradient(#ffe39a, #c4e9ff 85%, #8fd18a 85%)";
+const FARM = "linear-gradient(#a9dcff 0 50%, #e7f7ff 50% 52%, #86cf6d 52%)";
+const ROOM = "linear-gradient(#f2dcff, #e5c6ff 74%, #c99a6c 74%)";
+
+const eggHTML = (cls = "") => `<div class="egg ${cls}"><i class="e l"></i><i class="e r"></i><i class="m"></i><i class="belt"></i></div>`;
+
+function humptyBase(S) { S.bg(DAY); S.sprite("☁️", 18, 14, 14, "deco float"); S.sprite("🏰", 86, 40, 16, "deco"); S.div("wall"); }
+function piecesOnGround(S) {
+  const a = S.sprite(eggHTML("top"), 30, 97, 20, "anchor");
+  const b = S.sprite(eggHTML("bot"), 70, 97, 20, "anchor");
+  return [a, b];
+}
+function spiderBase(S, bg) { S.bg(bg); S.div("spout"); S.sprite("🌼", 18, 90, 9, "deco"); S.sprite("🌷", 84, 90, 9, "deco"); }
+function climbLine(S, bg, withSun) {
+  spiderBase(S, bg);
+  if (withSun) S.sprite("☀️", 80, 16, 20, "deco float");
+  else S.sprite("☁️", 22, 16, 16, "deco float");
+  const sp = S.sprite("🕷️", 60, 86, 12, "popin"); let y = 86;
+  S.goal(5);
+  S.tap(sp, () => { if (cur.lineDone) { S.anim(sp, "a-wiggle"); S.note(); return; } y -= 13; S.place(sp, 60, y); S.anim(sp, "a-wiggle"); S.tick(); });
+}
+function farmScene(S) { S.bg(FARM); S.sprite("☀️", 86, 13, 16, "deco"); S.sprite("🌳", 8, 48, 16, "deco"); S.sprite("🌾", 92, 82, 10, "deco"); S.sprite("🌾", 6, 90, 9, "deco"); }
+function animalLine(name, ch, sound) {
+  return {
+    text: `And on his farm he had a ${name}, E-I-E-I-O!`, hint: `Tap the ${name}!`,
+    setup(S) {
+      farmScene(S);
+      const lab = S.div("label"); lab.textContent = "";
+      const a = S.sprite(ch, 50, 64, 34, "popin");
+      S.goal(3);
+      S.tap(a, () => { S.anim(a, "a-wiggle"); S.bubble(sound + "!", 72, 40, 8); S.say(sound); lab.textContent = name.toUpperCase(); S.tick(); });
+    }
+  };
+}
+const ANIMALS = [["cow", "🐄", "Moo"], ["duck", "🦆", "Quack"], ["pig", "🐖", "Oink"], ["sheep", "🐑", "Baa"]];
+
+function monkeyScene(S, onBed, fallen) {
+  S.bg(ROOM);
+  S.sprite("🪟", 82, 22, 18, "deco");
+  S.sprite("🛏️", 50, 66, 62, "deco");
+  const c = S.div("count"); c.textContent = onBed;
+  const ms = [];
+  for (let i = 0; i < onBed; i++) {
+    const x = onBed === 1 ? 50 : 28 + i * (44 / (onBed - 1));
+    const m = S.sprite("🐒", x, 46, 13, "bounce"); m.style.animationDelay = (i * .17) + "s"; ms.push(m);
+  }
+  for (let i = 0; i < fallen; i++) {
+    S.sprite("🐒", 10 + i * 9, 91, 9, "deco");
+    S.sprite("🩹", 12 + i * 9, 86, 4, "deco");
+  }
+  return { ms, c };
+}
+
+const RHYMES = [
+  {
+    id: "twinkle", title: "Twinkle, Twinkle", icon: "⭐", color: "#4a3a9c",
+    tune: "C C G G A A G F F E E D D C G G F F E E D G G F F E E D".split(" "),
+    lines: [
+      { text: "Twinkle, twinkle, little star,", hint: "Tap the sky to make stars!",
+        setup(S) {
+          S.bg(NIGHT); S.decor(14); S.sprite("🌙", 84, 18, 15, "deco float"); S.goal(6);
+          S.onStage(e => { const [x, y] = S.pct(e); S.sprite("⭐", x, y, 10, "twinkle"); S.burst(x, y, 4); S.tick(); });
+        } },
+      { text: "How I wonder what you are!", hint: "Tap the big star!",
+        setup(S) {
+          S.bg(NIGHT); S.decor(14);
+          const st = S.sprite("🌟", 50, 50, 34, "twinkle"); S.goal(3);
+          S.tap(st, () => { S.anim(st, "a-spin"); S.bubble(pick(["?", "Who?", "What?"]), rnd(20, 80), rnd(20, 35), 8); S.tick(); });
+        } },
+      { text: "Up above the world so high,", hint: "Tap the star to send it up high!",
+        setup(S) {
+          S.bg(NIGHT); S.decor(12);
+          S.sprite("🌍", 50, 104, 54, "deco");
+          const st = S.sprite("⭐", 50, 66, 15, "twinkle"); let y = 66; S.goal(3);
+          S.tap(st, () => { if (!cur.lineDone) { y -= 15; S.place(st, 50, y); } S.burst(50, y + 6, 4); S.tick(); });
+        } },
+      { text: "Like a diamond in the sky.", hint: "Tap every diamond to make it shine!",
+        setup(S) {
+          S.bg(NIGHT); S.decor(10); S.goal(5);
+          [[18, 25], [44, 18], [72, 30], [30, 56], [64, 62]].forEach(([x, y]) => {
+            const d = S.sprite("💎", x, y, 14, "dim");
+            S.tap(d, () => { if (!d.classList.contains("dim")) { S.anim(d, "a-spin"); S.note(); return; } d.classList.remove("dim"); d.classList.add("twinkle"); S.burst(x, y, 6); S.tick(); });
+          });
+        } }
+    ]
+  },
+  {
+    id: "humpty", title: "Humpty Dumpty", icon: "🥚", color: "#d9573a",
+    tune: "C E E F F G G A G E C D E F E D C".split(" "),
+    lines: [
+      { text: "Humpty Dumpty sat on a wall,", hint: "Tap Humpty to say hello!",
+        setup(S) {
+          humptyBase(S);
+          const h = S.sprite(eggHTML(), 50, 57, 20, "anchor popin"); S.goal(3);
+          S.tap(h, () => { S.anim(h, "a-wiggle"); S.bubble(pick(["Hi!", "Hello!", "Hee hee!"]), 70, 30, 7); S.tick(); });
+        } },
+      { text: "Humpty Dumpty had a great fall.", hint: "Tap Humpty. Oops!",
+        setup(S) {
+          humptyBase(S);
+          const h = S.sprite(eggHTML(), 50, 57, 20, "anchor"); S.goal(1); let fell = false;
+          S.tap(h, () => {
+            if (fell) return; fell = true;
+            h.style.transition = "top .6s cubic-bezier(.5,0,1,1), left .6s, transform .6s"; h.style.transform = "rotate(80deg)";
+            S.place(h, 38, 97);
+            later(() => { h.remove(); boop(); piecesOnGround(S); S.bubble("CRACK!", 50, 55, 8); S.tick(); }, 620);
+          });
+        } },
+      { text: "All the king's horses and all the king's men", hint: "Tap to call the horses and men! Count them!",
+        setup(S) {
+          humptyBase(S); piecesOnGround(S);
+          const c = S.div("count"); c.textContent = "0"; let n = 0;
+          const slots = [[12, 80], [27, 84], [73, 84], [88, 80]];
+          S.goal(4);
+          S.onStage(() => {
+            if (n >= 4) { S.note(); return; }
+            const [x, y] = slots[n]; const ch = n % 2 ? "💂" : "🐴";
+            const s = S.sprite(ch, 108, y, 15, ""); requestAnimationFrame(() => requestAnimationFrame(() => S.place(s, x, y)));
+            n++; c.textContent = n; S.say(NUM[n]); S.tick();
+          });
+        } },
+      { text: "Couldn't put Humpty together again.", hint: "Can YOU fix Humpty? Drag the pieces together!",
+        setup(S) {
+          humptyBase(S); S.sprite("🐴", 12, 80, 15, "deco"); S.sprite("💂", 88, 80, 15, "deco");
+          const [a, b] = piecesOnGround(S); S.goal(1); let fixed = false;
+          const check = () => {
+            if (fixed) return;
+            const dx = a.dataset.x - b.dataset.x, dy = a.dataset.y - b.dataset.y;
+            if (Math.hypot(dx, dy) < 14) {
+              fixed = true; S.place(a, +b.dataset.x, +b.dataset.y);
+              S.sprite("🩹", +b.dataset.x + 3, +b.dataset.y - 20, 7, "popin");
+              S.bubble("Thank you!", 50, 30, 8); S.burst(+b.dataset.x, +b.dataset.y - 12, 12); S.tick();
+            }
+          };
+          S.drag(a, check); S.drag(b, check);
+        } }
+    ]
+  },
+  {
+    id: "spider", title: "Itsy Bitsy Spider", icon: "🕷️", color: "#2c8c9e",
+    tune: "G3 C C C D E E E D C D E C E E F G G F E F G E".split(" "),
+    lines: [
+      { text: "The itsy bitsy spider climbed up the water spout.", hint: "Tap the spider to help it climb!",
+        setup(S) { climbLine(S, SPRING, false); } },
+      { text: "Down came the rain and washed the spider out.", hint: "Tap the cloud to make it rain!",
+        setup(S) {
+          spiderBase(S, RAINY);
+          const sp = S.sprite("🕷️", 60, 22, 12, ""); let y = 22;
+          const cl = S.sprite("☁️", 30, 15, 26, "float"); S.goal(3);
+          S.tap(cl, () => {
+            S.anim(cl, "a-wiggle");
+            for (let i = 0; i < 7; i++) {
+              const d = S.sprite("💧", rnd(12, 70), 22, 5, "deco"); d.style.transition = `top ${rnd(.6, 1)}s linear`;
+              requestAnimationFrame(() => requestAnimationFrame(() => S.place(d, d.dataset.x, 100)));
+              setTimeout(() => d.remove(), 1100);
+            }
+            if (!cur.lineDone) { y = Math.min(86, y + 22); S.place(sp, 60, y); S.anim(sp, "a-spin"); }
+            S.tick();
+          });
+        } },
+      { text: "Out came the sun and dried up all the rain,", hint: "Tap the sun to dry the rain!",
+        setup(S) {
+          spiderBase(S, RAINY);
+          S.sprite("🕷️", 60, 86, 12, "");
+          const sun = S.sprite("☀️", 74, 20, 24, "");
+          const cl = S.sprite("☁️", 66, 24, 28, "");
+          S.goal(1);
+          const go = () => { if (cur.lineDone) { S.anim(sun, "a-spin"); S.note(); return; } S.place(cl, -30, 24); S.bg(SUNNY); S.anim(sun, "a-spin"); S.burst(74, 20, 10, ["☀️", "✨"]); S.tick(); };
+          S.tap(sun, go); S.tap(cl, go);
+        } },
+      { text: "And the itsy bitsy spider climbed up the spout again.", hint: "Tap the spider to climb again!",
+        setup(S) { climbLine(S, SUNNY, true); } }
+    ]
+  },
+  {
+    id: "farm", title: "Old MacDonald", icon: "🐄", color: "#3f9a3a",
+    tune: "G G G D E E D B B A A G".split(" "),
+    lines: [
+      { text: "Old MacDonald had a farm, E-I-E-I-O!", hint: "Tap the farmer to wave!",
+        setup(S) {
+          farmScene(S);
+          const tr = S.sprite("🚜", 20, 74, 16, "");
+          const f = S.sprite("👨‍🌾", 56, 64, 30, "popin"); S.goal(2);
+          S.tap(f, () => { S.anim(f, "a-wiggle"); S.bubble("E-I-E-I-O!", 56, 30, 7); S.tick(); });
+          S.tap(tr, () => { S.place(tr, +tr.dataset.x > 50 ? 20 : 80, 74); S.bubble("Vroom!", 50, 82, 6); boop(); });
+        } },
+      ...ANIMALS.map(a => animalLine(...a)),
+      { text: "Old MacDonald had a farm, E-I-E-I-O!", hint: "Tap every animal!",
+        setup(S) {
+          farmScene(S); S.sprite("👨‍🌾", 50, 40, 20, "deco"); S.goal(4);
+          ANIMALS.forEach(([name, ch, sound], i) => {
+            const a = S.sprite(ch, 14 + i * 24, 72, 18, "popin"); let seen = false;
+            S.tap(a, () => { S.anim(a, "a-jump"); S.bubble(sound + "!", 14 + i * 24, 52, 6); S.say(sound); if (!seen) { seen = true; S.tick(); } else S.note(); });
+          });
+        } }
+    ]
+  },
+  {
+    id: "monkeys", title: "Five Little Monkeys", icon: "🐒", color: "#a0559c",
+    tune: "C C E E G G E D D F F A A G".split(" "),
+    lines: [
+      ...[5, 4, 3, 2, 1].flatMap(n => [
+        { text: `${NUM[n]} little ${n > 1 ? "monkeys" : "monkey"} jumping on the bed,`, hint: "Tap the monkeys to make them jump!",
+          setup(S) {
+            const { ms } = monkeyScene(S, n, 5 - n); S.goal(3);
+            ms.forEach(m => S.tap(m, () => { S.anim(m, "a-jump"); S.tick(); }));
+          } },
+        { text: "One fell off and bumped his head!", hint: "Tap a monkey. Bump!",
+          setup(S) {
+            const { ms, c } = monkeyScene(S, n, 5 - n); S.goal(1); let fell = false;
+            ms.forEach(m => S.tap(m, () => {
+              if (fell) return; fell = true;
+              m.classList.remove("bounce"); m.style.transform = "rotate(160deg)";
+              S.place(m, 10 + (5 - n) * 9, 91); boop();
+              later(() => { S.sprite("🩹", 12 + (5 - n) * 9, 86, 4, "popin"); c.textContent = n - 1; S.say(n - 1 === 0 ? "None left!" : `${NUM[n - 1]} left!`); S.tick(); }, 520);
+            }));
+          } }
+      ]),
+      { text: "Mama called the doctor and the doctor said,", hint: "Tap the phone to call the doctor!",
+        setup(S) {
+          monkeyScene(S, 0, 5);
+          const ph = S.sprite("☎️", 78, 34, 18, "popin"); S.goal(1);
+          S.tap(ph, () => {
+            S.anim(ph, "a-wiggle"); S.bubble("Ring ring!", 60, 18, 7);
+            if (!cur.lineDone) { later(() => S.sprite("👩‍⚕️", 82, 66, 24, "popin"), 400); S.tick(); } else S.note();
+          });
+        } },
+      { text: "No more monkeys jumping on the bed!", hint: "Tap each monkey to tuck it into bed!",
+        setup(S) {
+          S.bg(ROOM); S.sprite("🪟", 82, 22, 18, "deco"); S.sprite("🛏️", 50, 66, 62, "deco"); S.sprite("👩‍⚕️", 88, 66, 18, "deco");
+          S.goal(5); let slot = 0;
+          for (let i = 0; i < 5; i++) {
+            const m = S.sprite("🐒", 10 + i * 9, 91, 9, "");
+            S.tap(m, () => {
+              if (m.dataset.bed) return; m.dataset.bed = 1;
+              S.place(m, 28 + slot * 11, 52); slot++;
+              later(() => { m.textContent = "😴"; }, 450); S.tick();
+            });
+          }
+        } }
+    ]
+  }
+];
+
+/* ================= player ================= */
+function show(id) { ["home", "player", "popgame"].forEach(s => $(s).hidden = s !== id); }
+
+function openRhyme(id) {
+  audio();
+  const r = RHYMES.find(x => x.id === id);
+  cur = { r, li: 0, tuneI: 0 };
+  $("pTitle").textContent = r.title;
+  show("player");
+  runLine();
+}
+
+function runLine() {
+  clearTimers();
+  const r = cur.r, line = r.lines[cur.li];
+  Object.assign(cur, { lineDone: false, speechDone: false, advancing: false, goalN: 1, count: 0 });
+  stage.innerHTML = ""; stage.onpointerdown = null; stage.style.background = "";
+  $("steps").innerHTML = r.lines.map((_, i) => `<i class="${i < cur.li ? "on" : i === cur.li ? "now" : ""}"></i>`).join("");
+  $("words").innerHTML = line.text.split(" ").map(w => `<button class="w">${w}</button>`).join("");
+  $("words").querySelectorAll(".w").forEach(b => b.addEventListener("pointerdown", e => {
+    e.preventDefault(); b.classList.add("lit"); setTimeout(() => b.classList.remove("lit"), 500);
+    say(b.textContent.replace(/[^\w'-]/g, ""));
+  }));
+  $("hint").textContent = line.hint; $("hint").classList.remove("yay");
+  line.setup(makeS(stage));
+  const myLine = cur.li;
+  speakLine(line.text, () => {
+    if (!cur || cur.li !== myLine) return;
+    cur.speechDone = true;
+    if (!cur.lineDone) later(() => { if (cur && cur.li === myLine && !cur.lineDone) say(line.hint, { rate: .95 }); }, 400);
+    maybeAdvance();
+  });
+}
+
+function maybeAdvance() {
+  if (!cur || !cur.lineDone || !cur.speechDone || cur.advancing) return;
+  cur.advancing = true;
+  later(() => {
+    cur.li++;
+    if (cur.li < cur.r.lines.length) runLine(); else finishRhyme();
+  }, 1300);
+}
+
+function finishRhyme() {
+  const r = cur.r;
+  saved.done[r.id] = true; persist(); renderHome();
+  fanfare();
+  celebrate(r.icon, `You sang ${r.title}!`, "You earned a star sticker.", () => openRhyme(r.id));
+  say(`Hooray! You sang ${r.title}!`);
+}
+
+function celebrate(icon, title, text, again) {
+  $("celeIcon").textContent = icon; $("celeTitle").textContent = title; $("celeText").textContent = text;
+  $("overlay").hidden = false;
+  $("againBtn").onclick = () => { $("overlay").hidden = true; again(); };
+}
+$("moreBtn").onclick = () => { $("overlay").hidden = true; goHome(); };
+
+function goHome() { stopSpeech(); clearTimers(); stopPop(); cur = null; stage.innerHTML = ""; show("home"); }
+$("homeBtn").onclick = goHome;
+$("popHome").onclick = goHome;
+$("sayBtn").onclick = () => {
+  if (!cur) return;
+  const line = cur.r.lines[cur.li], myLine = cur.li;
+  cur.speechDone = false;
+  speakLine(line.text, () => { if (cur && cur.li === myLine) { cur.speechDone = true; maybeAdvance(); } });
+};
+
+/* ================= rhyme pop ================= */
+const FAM = [
+  { w: "cat", e: "🐱", r: [["hat", "🎩"], ["bat", "🦇"], ["rat", "🐀"]] },
+  { w: "dog", e: "🐶", r: [["frog", "🐸"], ["log", "🪵"]] },
+  { w: "bee", e: "🐝", r: [["tree", "🌳"], ["key", "🔑"], ["three", "3️⃣"]] },
+  { w: "moon", e: "🌙", r: [["spoon", "🥄"], ["balloon", "🎈"], ["raccoon", "🦝"]] },
+  { w: "cake", e: "🎂", r: [["snake", "🐍"], ["lake", "🏞️"]] },
+  { w: "goat", e: "🐐", r: [["boat", "⛵"], ["coat", "🧥"]] },
+  { w: "bear", e: "🐻", r: [["pear", "🍐"], ["chair", "🪑"]] },
+  { w: "star", e: "⭐", r: [["car", "🚗"], ["jar", "🫙"]] },
+  { w: "fish", e: "🐟", r: [["dish", "🍽️"], ["wish", "🌠"]] }
+];
+const ROUNDS = 3, HITS = 4;
+const popStage = $("popStage");
+let game = null;
+
+function openPop() {
+  audio(); show("popgame");
+  game = { round: 0, fams: shuffle(FAM).slice(0, ROUNDS), spawn: null };
+  startRound();
+}
+function stopPop() { if (game) clearInterval(game.spawn); game = null; popStage.innerHTML = ""; }
+
+function startRound() {
+  clearInterval(game.spawn);
+  const f = game.fams[game.round]; game.f = f; game.hits = 0;
+  popStage.innerHTML = `<div class="target"><span class="ic">${f.e}</span><div><small>Rhymes with</small><span class="tw">${f.w}</span></div></div>`;
+  renderPopSteps();
+  $("popHint").textContent = `Pop the bubbles that rhyme with “${f.w}”!`; $("popHint").classList.remove("yay");
+  say(`Pop the words that rhyme with ${f.w}!`);
+  game.spawn = setInterval(spawnBubble, 1150);
+  setTimeout(spawnBubble, 300);
+}
+function renderPopSteps() {
+  $("popSteps").innerHTML = Array.from({ length: HITS }, (_, i) => `<i class="${i < game.hits ? "on" : ""}"></i>`).join("");
+}
+function spawnBubble() {
+  if (!game) return;
+  const good = Math.random() < .5;
+  let w, e;
+  if (good) [w, e] = pick(game.f.r);
+  else { const o = pick(FAM.filter(x => x !== game.f)); [w, e] = Math.random() < .5 ? [o.w, o.e] : pick(o.r); }
+  const b = document.createElement("div");
+  b.className = "bub"; b.innerHTML = `<span class="ic">${e}</span><span class="bw">${w}</span>`;
+  b.style.left = rnd(16, 84) + "%"; b.style.animationDuration = rnd(6.5, 8.5) + "s";
+  b.addEventListener("animationend", ev => { if (ev.animationName === "rise") b.remove(); });
+  b.addEventListener("pointerdown", ev => {
+    ev.preventDefault();
+    if (!game || b.dataset.gone) return;
+    if (good) {
+      b.dataset.gone = 1; popSnd(); say(w);
+      const r = popStage.getBoundingClientRect(), br = b.getBoundingClientRect();
+      makeS(popStage).burst((br.left + br.width / 2 - r.left) / r.width * 100, (br.top + br.height / 2 - r.top) / r.height * 100, 8);
+      b.remove(); game.hits++; renderPopSteps();
+      if (game.hits >= HITS) roundWon();
+    } else {
+      boop(); say(w);
+      b.classList.add("nope"); setTimeout(() => b.classList.remove("nope"), 450);
+    }
+  });
+  popStage.appendChild(b);
+}
+function roundWon() {
+  clearInterval(game.spawn); chime();
+  $("popHint").textContent = "You found them all!"; $("popHint").classList.add("yay");
+  game.round++;
+  setTimeout(() => {
+    if (!game) return;
+    if (game.round < ROUNDS) startRound();
+    else {
+      saved.pops = (saved.pops || 0) + 1; persist(); renderHome(); fanfare();
+      say("Hooray! You are a rhyme star!");
+      celebrate("🫧", "You are a rhyme star!", `You popped ${ROUNDS * HITS} rhyming words.`, openPop);
+      stopPop();
+    }
+  }, 1400);
+}
+$("popSay").onclick = () => { if (game) say(`Pop the words that rhyme with ${game.f.w}!`); };
+
+/* ================= home ================= */
+function renderHome() {
+  const stars = Object.keys(saved.done).length + (saved.pops || 0);
+  $("starCount").textContent = "⭐ " + stars;
+  $("tiles").innerHTML = RHYMES.map(r => `
+    <button class="tile" data-id="${r.id}" style="background:${r.color}">
+      ${saved.done[r.id] ? '<span class="done">★ Sung</span>' : ""}
+      <span class="ic">${r.icon}</span><span class="nm">${r.title}</span>
+    </button>`).join("") + `
+    <button class="tile pop" data-id="pop">
+      ${saved.pops ? `<span class="done">★ ×${saved.pops}</span>` : ""}
+      <span class="ic">🫧</span><span class="nm">Rhyme Pop</span><span class="sub">Pop the words that rhyme!</span>
+    </button>`;
+}
+$("tiles").addEventListener("click", e => {
+  const t = e.target.closest(".tile"); if (!t) return;
+  t.dataset.id === "pop" ? openPop() : openRhyme(t.dataset.id);
+});
+if (!synth) $("tip").textContent = "This browser can't read aloud, so the words light up without a voice. Taps still make music.";
+renderHome();
+</script>
