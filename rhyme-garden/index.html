@@ -49,6 +49,22 @@ button:focus-visible { outline: 3px solid var(--tang); outline-offset: 3px; }
 .tile.pop .ic { grid-row: span 2; }
 .tile.pop .sub { font-size: 15px; opacity: .95; }
 .tip { color: var(--soft); font-size: 14px; text-align: center; }
+.head-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.name-chip { border: 0; color: var(--ink); font: 900 18px var(--display); max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
+.name-chip:active { transform: translateY(3px); box-shadow: 0 1px 0 #9cc6ea; }
+.name-form { text-align: left; justify-items: stretch; }
+.name-form h3 { text-align: center; }
+.wave { font-size: 72px; line-height: 1; text-align: center; animation: wiggle 1.4s ease-in-out infinite; }
+.field { display: grid; gap: 6px; }
+.field label { font: 900 15px var(--display); color: var(--soft); }
+.field small { color: var(--soft); font-size: 13px; }
+.name-form input, .name-form select { width: 100%; min-width: 0; font: 700 20px var(--read); color: var(--ink); background: #f3f1fb; border: 3px solid #d7d3ea; border-radius: 16px; padding: 10px 14px; }
+.name-form select { font-size: 16px; }
+.name-form input:focus-visible, .name-form select:focus-visible { outline: none; border-color: var(--tang); }
+.voice-row { display: flex; gap: 8px; }
+.voice-row select { flex: 1; }
+.try-btn { flex: none; border: 0; border-radius: 16px; padding: 0 16px; font: 900 16px var(--display); background: var(--sun); color: var(--ink); }
+.skip { border: 0; background: none; color: var(--soft); text-decoration: underline; font-size: 14px; justify-self: center; }
 .sec { margin: 6px 0 -4px; font: 900 24px var(--display); color: var(--ink); }
 .tile .skill { font: 700 12px var(--read); letter-spacing: .06em; text-transform: uppercase; background: rgba(255,255,255,.22); border-radius: 99px; padding: 3px 9px; }
 
@@ -186,7 +202,7 @@ button:focus-visible { outline: 3px solid var(--tang); outline-offset: 3px; }
 .a-jump { animation: jump .6s ease-out; }
 .a-pop { animation: popin .4s; }
 @media (prefers-reduced-motion: reduce) {
-  .float, .bounce, .twinkle, .hint::before, .cele .big { animation: none !important; }
+  .float, .bounce, .twinkle, .hint::before, .cele .big, .wave { animation: none !important; }
   .sp { transition-duration: .01s; }
 }
 </style>
@@ -198,9 +214,12 @@ button:focus-visible { outline: 3px solid var(--tang); outline-offset: 3px; }
       <div class="home-head">
         <div>
           <h1>Rhyme <span>Garden</span></h1>
-          <p>Touch the pictures. Sing the songs.</p>
+          <p id="hello">Touch the pictures. Sing the songs.</p>
         </div>
-        <div class="star-count" id="starCount">⭐ 0</div>
+        <div class="head-btns">
+          <button class="star-count name-chip" id="nameChip">👋 Add name</button>
+          <div class="star-count" id="starCount">⭐ 0</div>
+        </div>
       </div>
       <h2 class="sec">Sing along</h2>
       <div class="tiles" id="tiles"></div>
@@ -259,6 +278,28 @@ button:focus-visible { outline: 3px solid var(--tang); outline-offset: 3px; }
     </div>
   </section>
 
+  <!-- WHO'S PLAYING -->
+  <div class="overlay" id="namePanel" hidden>
+    <form class="cele name-form" id="nameForm" autocomplete="off">
+      <div class="wave" aria-hidden="true">👋</div>
+      <h3>Who's playing today?</h3>
+      <div class="field">
+        <label for="kidName">Child's name</label>
+        <input id="kidName" maxlength="20" placeholder="Type a name" autocapitalize="words" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="voiceSel">Friend's voice</label>
+        <div class="voice-row">
+          <select id="voiceSel"></select>
+          <button type="button" class="try-btn" id="tryVoice">▶ Try</button>
+        </div>
+        <small id="voiceNote">Voices come from this device. Pick the one that sounds friendliest.</small>
+      </div>
+      <button class="pill-btn" type="submit">Let's play!</button>
+      <button class="skip" type="button" id="skipName">Play without a name</button>
+    </form>
+  </div>
+
   <div class="overlay" id="overlay" hidden>
     <div class="cele">
       <div class="big" id="celeIcon">⭐</div>
@@ -293,50 +334,84 @@ const chime = () => [0, 4, 7, 12].forEach((s, i) => tone(523.25 * 2 ** (s / 12),
 const boop = () => { tone(220, .18, "sine", .16); tone(165, .25, "sine", .14, .1); };
 const fanfare = () => [0, 4, 7, 12, 7, 12].forEach((s, i) => tone(392 * 2 ** (s / 12), .5, "square", .07, i * .13));
 
+/* ================= storage ================= */
+const KEY = "rhyme-garden-v1";
+let saved = { done: {}, pops: 0, games: {}, name: "", voice: "" };
+try { saved = Object.assign(saved, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
+const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} };
+
+/* ================= friendly words ================= */
+// "{n}" is the child's name. Without a name, the phrase still reads naturally.
+function fill(s) {
+  if (saved.name) return s.replace(/\{n\}/g, saved.name);
+  s = s.replace(/\{n\},\s*/g, "").replace(/,?\s*\{n\}/g, "").trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+const PRAISE = ["Great job, {n}!", "Yay, {n}!", "You did it!", "Super, {n}!", "Wow, well done!", "You're amazing, {n}!", "High five, {n}!"];
+const TRY = ["Nice try, {n}!", "Almost, {n}!", "Ooh, so close!", "Good try, {n}!"];
+const withName = h => Math.random() < .6 ? "{n}, " + h.charAt(0).toLowerCase() + h.slice(1) : h;
+
 /* ================= speech ================= */
 const synth = window.speechSynthesis || null;
+const TALK = { rate: .95, pitch: 1.1 }, SING = { rate: .85, pitch: 1.15 };
 let voice = null, speakToken = 0;
+function voiceScore(v) {
+  if (!/^en/i.test(v.lang)) return -99;
+  const n = v.name; let s = 0;
+  if (/natural|neural|online|premium|enhanced/i.test(n)) s += 6;
+  if (/aria|jenny|ava|emma|libby|sonia|natasha|neerja|samantha|serena|karen|moira|tessa|veena|google us english|google uk english female|female/i.test(n)) s += 3;
+  if (/novelty|bells|bad news|whisper|zarvox|trinoids|albert|cellos|organ|boing|bubbles|jester|superstar|wobble|hysterical|bahh|deranged|grandpa|grandma|fred|junior|ralph/i.test(n)) s -= 20;
+  if (/en-(US|GB|AU|IN|IE|NZ)/i.test(v.lang)) s += 1;
+  return s;
+}
+function englishVoices() { return synth ? synth.getVoices().filter(v => voiceScore(v) > -20).sort((a, b) => voiceScore(b) - voiceScore(a)) : []; }
 function pickVoice() {
-  if (!synth) return;
-  const vs = synth.getVoices();
-  voice = vs.find(v => /^en/i.test(v.lang) && /female|samantha|karen|serena|moira|tessa|zira/i.test(v.name))
-       || vs.find(v => /^en-(GB|US)/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+  const vs = englishVoices();
+  voice = vs.find(v => v.name === saved.voice) || vs[0] || null;
+  fillVoiceSelect();
 }
 if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
 
-function utter(text, rate = .85, pitch = 1.25) {
+function utter(text, o = TALK) {
   const u = new SpeechSynthesisUtterance(text);
-  if (voice) u.voice = voice;
-  u.rate = rate; u.pitch = pitch; u.lang = voice ? voice.lang : "en-US";
+  if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = "en-US";
+  u.rate = o.rate; u.pitch = o.pitch;
   return u;
 }
-// Short word or phrase. Interrupts whatever is playing.
+// Talk to the child. Interrupts whatever is playing.
 function say(text, opts = {}) {
   const tok = ++speakToken;
   if (cur && !cur.speechDone) { cur.speechDone = true; markWords(99); maybeAdvance(); }
   if (!synth) return;
   synth.cancel();
-  const u = utter(text, opts.rate || .9, opts.pitch || 1.3);
+  const u = utter(fill(text), { rate: opts.rate || TALK.rate, pitch: opts.pitch || TALK.pitch });
   if (opts.onend) u.onend = () => { if (tok === speakToken) opts.onend(); };
   synth.speak(u);
 }
-// Sing a lyric line with karaoke highlighting.
-function speakLine(text, onend) {
+// Sing a lyric line with karaoke highlighting, optionally after a short spoken intro.
+function speakLine(text, onend, intro) {
   const tok = ++speakToken;
   if (synth) synth.cancel();
   const words = text.split(" ");
   const offs = []; let p = 0; words.forEach(w => { offs.push(p); p += w.length + 1; });
-  let i = 0, gotBoundary = false, finished = false;
-  markWords(0);
+  let i = 0, gotBoundary = false, finished = false, timer = null;
   const per = 430;
-  const timer = setInterval(() => { if (gotBoundary || tok !== speakToken) return clearInterval(timer); i = Math.min(i + 1, words.length - 1); markWords(i); }, per);
+  markWords(-1);
+  const startTimer = () => {
+    if (timer || gotBoundary || finished || tok !== speakToken) return;
+    markWords(0);
+    timer = setInterval(() => { if (gotBoundary || tok !== speakToken) return clearInterval(timer); i = Math.min(i + 1, words.length - 1); markWords(i); }, per);
+  };
   const finish = () => {
     if (finished || tok !== speakToken) return;
     finished = true; clearInterval(timer); clearTimeout(safety); markWords(99); onend && onend();
   };
-  const safety = setTimeout(finish, per * words.length + (synth ? 5000 : 300));
-  if (!synth) return;
-  const u = utter(text);
+  const safety = setTimeout(finish, per * words.length + (synth ? 5000 + (intro ? 4000 : 0) : 300));
+  if (!synth) { startTimer(); return; }
+  if (intro) synth.speak(utter(fill(intro), TALK));
+  const u = utter(text, SING);
+  u.onstart = startTimer;
+  setTimeout(startTimer, intro ? 4500 : 900); // in case the browser never fires onstart
   u.onboundary = e => {
     if (tok !== speakToken || (e.name && e.name !== "word")) return;
     gotBoundary = true; clearInterval(timer);
@@ -346,12 +421,6 @@ function speakLine(text, onend) {
   synth.speak(u);
 }
 function stopSpeech() { speakToken++; if (synth) synth.cancel(); }
-
-/* ================= storage ================= */
-const KEY = "rhyme-garden-v1";
-let saved = { done: {}, pops: 0 };
-try { saved = Object.assign(saved, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
-const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} };
 
 /* ================= helpers ================= */
 const $ = id => document.getElementById(id);
@@ -429,8 +498,10 @@ function makeS(st) {
     done() {
       if (cur.lineDone) return;
       cur.lineDone = true; renderGoal();
-      $("hint").textContent = pick(["Yay!", "Great job!", "Super!", "Well done!", "Wow!"]);
+      const praise = pick(PRAISE);
+      $("hint").textContent = fill(praise);
       $("hint").classList.add("yay");
+      if (cur.speechDone) say(praise);
       later(() => { chime(); S.burst(50, 45, 14); }, 250);
       maybeAdvance();
     },
@@ -702,10 +773,10 @@ function openRhyme(id) {
   cur = { r, li: 0, tuneI: 0 };
   $("pTitle").textContent = r.title;
   show("player");
-  runLine();
+  runLine(pick(["Hi {n}! Let's sing " + r.title + "!", "Let's sing " + r.title + " together, {n}!", "Ready, {n}? Let's sing " + r.title + "!"]));
 }
 
-function runLine() {
+function runLine(intro) {
   clearTimers();
   const r = cur.r, line = r.lines[cur.li];
   Object.assign(cur, { lineDone: false, speechDone: false, advancing: false, goalN: 1, count: 0 });
@@ -722,9 +793,9 @@ function runLine() {
   speakLine(line.text, () => {
     if (!cur || cur.li !== myLine) return;
     cur.speechDone = true;
-    if (!cur.lineDone) later(() => { if (cur && cur.li === myLine && !cur.lineDone) say(line.hint, { rate: .95 }); }, 400);
+    if (!cur.lineDone) later(() => { if (cur && cur.li === myLine && !cur.lineDone) say(withName(line.hint)); }, 400);
     maybeAdvance();
-  });
+  }, intro);
 }
 
 function maybeAdvance() {
@@ -733,19 +804,19 @@ function maybeAdvance() {
   later(() => {
     cur.li++;
     if (cur.li < cur.r.lines.length) runLine(); else finishRhyme();
-  }, 1300);
+  }, 1600);
 }
 
 function finishRhyme() {
   const r = cur.r;
   saved.done[r.id] = true; persist(); renderHome();
   fanfare();
-  celebrate(r.icon, `You sang ${r.title}!`, "You earned a star sticker.", () => openRhyme(r.id));
-  say(`Hooray! You sang ${r.title}!`);
+  celebrate(r.icon, "Great singing, {n}!", `You sang ${r.title} and earned a star sticker.`, () => openRhyme(r.id));
+  say(`Hooray, {n}! You sang ${r.title}! I loved it!`);
 }
 
 function celebrate(icon, title, text, again) {
-  $("celeIcon").textContent = icon; $("celeTitle").textContent = title; $("celeText").textContent = text;
+  $("celeIcon").textContent = icon; $("celeTitle").textContent = fill(title); $("celeText").textContent = fill(text);
   $("overlay").hidden = false;
   $("againBtn").onclick = () => { $("overlay").hidden = true; again(); };
 }
@@ -790,7 +861,7 @@ function startRound() {
   popStage.innerHTML = `<div class="target"><span class="ic">${f.e}</span><div><small>Rhymes with</small><span class="tw">${f.w}</span></div></div>`;
   renderPopSteps();
   $("popHint").textContent = `Pop the bubbles that rhyme with “${f.w}”!`; $("popHint").classList.remove("yay");
-  say(`Pop the words that rhyme with ${f.w}!`);
+  say(game.round === 0 ? `{n}, pop the words that rhyme with ${f.w}!` : `Now ${f.w}! Pop the words that rhyme with ${f.w}, {n}!`);
   game.spawn = setInterval(spawnBubble, 1150);
   setTimeout(spawnBubble, 300);
 }
@@ -817,7 +888,7 @@ function spawnBubble() {
       b.remove(); game.hits++; renderPopSteps();
       if (game.hits >= HITS) roundWon();
     } else {
-      boop(); say(w);
+      boop(); say(Math.random() < .35 ? `${w}? ${pick(TRY)}` : w);
       b.classList.add("nope"); setTimeout(() => b.classList.remove("nope"), 450);
     }
   });
@@ -825,20 +896,21 @@ function spawnBubble() {
 }
 function roundWon() {
   clearInterval(game.spawn); chime();
-  $("popHint").textContent = "You found them all!"; $("popHint").classList.add("yay");
+  $("popHint").textContent = fill("You found them all, {n}!"); $("popHint").classList.add("yay");
+  say("You found them all, {n}!");
   game.round++;
   setTimeout(() => {
     if (!game) return;
     if (game.round < ROUNDS) startRound();
     else {
       saved.pops = (saved.pops || 0) + 1; persist(); renderHome(); fanfare();
-      say("Hooray! You are a rhyme star!");
-      celebrate("🫧", "You are a rhyme star!", `You popped ${ROUNDS * HITS} rhyming words.`, openPop);
+      say("Hooray, {n}! You are a rhyme star!");
+      celebrate("🫧", "You're a rhyme star, {n}!", `You popped ${ROUNDS * HITS} rhyming words.`, openPop);
       stopPop();
     }
   }, 1400);
 }
-$("popSay").onclick = () => { if (game) say(`Pop the words that rhyme with ${game.f.w}!`); };
+$("popSay").onclick = () => { if (game) say(`{n}, pop the words that rhyme with ${game.f.w}!`); };
 
 /* ================= think & play ================= */
 const COL = {
@@ -865,12 +937,12 @@ function runRound() {
   gm.def.round(makeS(gStage), gm.round, gctx);
 }
 const gctx = {
-  hint(t, speak = true) { if (!gm) return; $("gHint").textContent = t; $("gHint").classList.remove("yay"); gm.hintText = t; if (speak) say(t, { rate: .95 }); },
+  hint(t, speak = true) { if (!gm) return; $("gHint").textContent = fill(t); $("gHint").classList.remove("yay"); gm.hintText = t; if (speak) say(t, { rate: .95 }); },
   win(msg) {
     if (!gm || gm.won) return;
     gm.won = true;
-    const m = msg || pick(["Great thinking!", "You got it!", "Super!", "Brilliant!"]);
-    $("gHint").textContent = m; $("gHint").classList.add("yay");
+    const m = msg || pick(["Great thinking, {n}!", "You got it, {n}!", "Super!", "Brilliant, {n}!", "Wow, clever you!"]);
+    $("gHint").textContent = fill(m); $("gHint").classList.add("yay");
     chime(); makeS(gStage).burst(50, 45, 16); say(m);
     later(() => { if (!gm) return; gm.round++; gm.round < gm.def.rounds ? runRound() : finishGame(); }, 2000);
   }
@@ -906,7 +978,7 @@ const ODD_COLORS = ["red", "orange", "yellow", "green", "blue", "purple", "pink"
 const GAMES = [
   {
     id: "mix", title: "Color Mixer", icon: "🎨", color: "#e0602f", skill: "Colors & logic", rounds: 4,
-    praise: "You are a color scientist!", bg: "radial-gradient(circle at 50% 40%, #fffaf0, #ffe6c4)",
+    praise: "You're a color scientist, {n}!", bg: "radial-gradient(circle at 50% 40%, #fffaf0, #ffe6c4)",
     round(S, r, g) {
       const target = ["orange", "green", "purple", "pink"][r];
       const pots = r < 2 ? ["red", "yellow", "blue"] : ["red", "yellow", "blue", "white"];
@@ -936,19 +1008,19 @@ const GAMES = [
               if (res === target) { g.win(`${a} and ${b} make ${target}!`); }
               else {
                 boop();
-                g.hint(a === b ? `That's still ${res}. Try two different colors!` : `${a} and ${b} make ${res}. Try again!`);
+                g.hint(a === b ? `That's still ${res}. Try two different colors, {n}!` : `${a} and ${b} make ${res}. ${pick(TRY)} Try again!`);
                 later(() => { paint.style.height = "0"; inBowl = []; busy = false; }, 1600);
               }
             }, 1000);
           }
         });
       });
-      g.hint(`Make ${target}! Tap two paint pots.`);
+      g.hint(r === 0 ? `Hi {n}! Can you make ${target}? Tap two paint pots.` : `Now make ${target}, {n}!`);
     }
   },
   {
     id: "memory", title: "Memory Match", icon: "🃏", color: "#3466c9", skill: "Memory", rounds: 3,
-    praise: "Your memory is super strong!", bg: "linear-gradient(#e3f2ff, #c6e3ff)",
+    praise: "Your memory is super strong, {n}!", bg: "linear-gradient(#e3f2ff, #c6e3ff)",
     round(S, r, g) {
       const pairs = [3, 4, 6][r], cols = pairs === 3 ? 3 : 4, rows = pairs * 2 / cols;
       const items = shuffle([["🍎", "apple"], ["🍌", "banana"], ["🫐", "blueberries"], ["🍇", "grapes"], ["🥝", "kiwi"], ["🍊", "orange"], ["🍓", "strawberry"], ["🍐", "pear"]]).slice(0, pairs);
@@ -978,12 +1050,12 @@ const GAMES = [
         });
         grid.appendChild(c);
       });
-      g.hint(r === 0 ? "Flip two cards. Find the pairs!" : `Find all ${pairs} pairs!`);
+      g.hint(r === 0 ? "{n}, flip two cards and find the pairs!" : `Find all ${pairs} pairs, {n}!`);
     }
   },
   {
     id: "lights", title: "Follow the Lights", icon: "💡", color: "#2a3566", skill: "Focus", rounds: 5,
-    praise: "You followed every light!", bg: "radial-gradient(circle at 50% 40%, #33447a, #151b3c)",
+    praise: "You followed every light, {n}!", bg: "radial-gradient(circle at 50% 40%, #33447a, #151b3c)",
     round(S, r, g) {
       const PADS = [{ c: "red", s: "★", n: "C" }, { c: "blue", s: "●", n: "E" }, { c: "yellow", s: "▲", n: "G" }, { c: "green", s: "■", n: "C5" }];
       const len = r + 2;
@@ -1002,7 +1074,7 @@ const GAMES = [
             if (pos === len) { accepting = false; later(() => g.win(len > 3 ? `Wow! ${NUM[len] || len} lights!` : null), 400); }
           } else {
             accepting = false; later(boop, 250);
-            g.hint("Oops! Watch again.");
+            g.hint(`${pick(TRY)} Let's watch again.`);
             later(play, 1500);
           }
         });
@@ -1023,7 +1095,7 @@ const GAMES = [
   },
   {
     id: "sort", title: "Color Sort", icon: "🧺", color: "#25936a", skill: "Sorting", rounds: 3,
-    praise: "Everything is sorted!", bg: "linear-gradient(#eaf7ff, #d6f1d4)",
+    praise: "You sorted everything, {n}!", bg: "linear-gradient(#eaf7ff, #d6f1d4)",
     round(S, r, g) {
       const colors = [["red", "yellow"], ["red", "yellow", "green"], ["red", "yellow", "green", "blue"]][r];
       const n = [4, 6, 8][r];
@@ -1047,16 +1119,16 @@ const GAMES = [
             if (++sorted === n) later(() => g.win(), 700);
           } else {
             boop(); S.place(el, hx, hy);
-            g.hint(`The ${name} is ${c}!`);
+            g.hint(`${pick(TRY)} The ${name} is ${c}!`);
           }
         });
       });
-      g.hint(r === 0 ? "Drag each one to the basket with the same color!" : "Sort them by color!");
+      g.hint(r === 0 ? "{n}, drag each one to the basket with the same color!" : "Sort them by color, {n}!");
     }
   },
   {
     id: "odd", title: "Odd One Out", icon: "🔍", color: "#8448bf", skill: "Attention", rounds: 5,
-    praise: "You have super sharp eyes!", bg: "linear-gradient(#fbf2ff, #e6d8ff)",
+    praise: "You have super sharp eyes, {n}!", bg: "linear-gradient(#fbf2ff, #e6d8ff)",
     round(S, r, g) {
       const n = [4, 4, 6, 6, 9][r], cols = n === 4 ? 2 : 3;
       const shapeNames = Object.keys(SHAPES);
@@ -1076,14 +1148,48 @@ const GAMES = [
           ev.preventDefault(); ev.stopPropagation();
           if (gm.won) return;
           if (odd) { S.anim(b, "a-pop"); g.win(`Yes! The ${co} ${sh}!`); }
-          else { S.anim(b, "a-wiggle"); boop(); g.hint(byColor ? "Look again! Which color is different?" : "Look again! Which shape is different?"); }
+          else { S.anim(b, "a-wiggle"); boop(); g.hint(byColor ? "Look again, {n}! Which color is different?" : "Look again, {n}! Which shape is different?"); }
         });
         grid.appendChild(b);
       }
-      g.hint(r === 0 ? "Which one is different?" : "Find the odd one out!");
+      g.hint(r === 0 ? "{n}, which one is different?" : "Find the odd one out, {n}!");
     }
   }
 ];
+
+/* ================= who's playing ================= */
+function fillVoiceSelect() {
+  const sel = document.getElementById("voiceSel"); if (!sel) return;
+  const vs = englishVoices();
+  sel.innerHTML = `<option value="">Friendliest voice (automatic)</option>` +
+    vs.map(v => `<option value="${v.name.replace(/"/g, "&quot;")}">${v.name.replace(/</g, "&lt;")} (${v.lang})</option>`).join("");
+  sel.value = vs.some(v => v.name === saved.voice) ? saved.voice : "";
+  document.getElementById("voiceNote").textContent = !synth ? "This browser can't talk, so the words light up without a voice."
+    : vs.length ? "Voices come from this device. Pick the one that sounds friendliest." : "Loading voices…";
+}
+function openNamePanel() {
+  $("kidName").value = saved.name || "";
+  fillVoiceSelect();
+  $("namePanel").hidden = false;
+  setTimeout(() => $("kidName").focus(), 50);
+}
+const cleanName = v => v.replace(/[<>{}\[\]0-9_@#$%^&*=+|\\/]/g, "").replace(/\s+/g, " ").trim().slice(0, 20);
+$("voiceSel").addEventListener("change", () => { saved.voice = $("voiceSel").value; persist(); pickVoice(); });
+$("tryVoice").onclick = () => {
+  audio();
+  const nm = cleanName($("kidName").value);
+  const old = saved.name; saved.name = nm;
+  say(nm ? `Hi ${nm}! I'm your Rhyme Garden friend. Let's sing and play!` : "Hi there! I'm your Rhyme Garden friend. Let's sing and play!");
+  saved.name = old;
+};
+$("nameForm").addEventListener("submit", e => {
+  e.preventDefault(); audio();
+  saved.name = cleanName($("kidName").value); persist();
+  $("namePanel").hidden = true; renderHome();
+  say(saved.name ? pick(["Hi {n}! Welcome to Rhyme Garden! What shall we play?", "Hello {n}! I'm so happy you're here. Let's play!"]) : "Hello! Welcome to Rhyme Garden! Let's play!");
+});
+$("skipName").onclick = () => { saved.name = ""; saved.asked = true; persist(); $("namePanel").hidden = true; renderHome(); };
+$("nameChip").onclick = openNamePanel;
 
 /* ================= home ================= */
 function renderHome() {
@@ -1095,6 +1201,8 @@ function renderHome() {
       <span class="ic">${d.icon}</span><span class="nm">${d.title}</span><span class="skill">${d.skill}</span>
     </button>`).join("");
   $("starCount").textContent = "⭐ " + stars;
+  $("nameChip").textContent = saved.name ? `👋 ${saved.name}` : "👋 Add name";
+  $("hello").textContent = saved.name ? `Hi ${saved.name}! Touch the pictures. Sing the songs.` : "Touch the pictures. Sing the songs.";
   $("tiles").innerHTML = RHYMES.map(r => `
     <button class="tile" data-id="${r.id}" style="background:${r.color}">
       ${saved.done[r.id] ? '<span class="done">★ Sung</span>' : ""}
@@ -1114,4 +1222,5 @@ $("gameTiles").addEventListener("click", e => {
 });
 if (!synth) $("tip").textContent = "This browser can't read aloud, so the words light up without a voice. Taps still make music.";
 renderHome();
+if (!saved.name && !saved.asked) openNamePanel();
 </script>
